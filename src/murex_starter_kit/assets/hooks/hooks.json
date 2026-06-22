@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "disableAllHooks": false,
+  "hooks": {
+    "preToolUse": [
+      {
+        "type": "command",
+        "matcher": "create|edit",
+        "bash": "bash .github/hooks/scripts/restricted-path-guard.sh",
+        "powershell": "pwsh -File .github/hooks/scripts/restricted-path-guard.ps1",
+        "timeoutSec": 10
+      },
+      {
+        "type": "command",
+        "matcher": "bash|powershell",
+        "bash": "bash .github/hooks/scripts/dangerous-command-guard.sh",
+        "powershell": "pwsh -File .github/hooks/scripts/dangerous-command-guard.ps1",
+        "timeoutSec": 10
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "matcher": "create|edit",
+        "bash": "bash .github/hooks/scripts/lint-on-edit.sh",
+        "powershell": "pwsh -File .github/hooks/scripts/lint-on-edit.ps1",
+        "timeoutSec": 60
+      },
+      {
+        "type": "command",
+        "bash": "bash .github/hooks/scripts/audit-log.sh",
+        "powershell": "pwsh -File .github/hooks/scripts/audit-log.ps1",
+        "timeoutSec": 10
+      }
+    ],
+    "userPromptSubmitted": [
+      {
+        "type": "command",
+        "bash": "bash .github/hooks/scripts/audit-log.sh",
+        "powershell": "pwsh -File .github/hooks/scripts/audit-log.ps1",
+        "timeoutSec": 10
+      }
+    ],
+    "sessionEnd": [
+      {
+        "type": "command",
+        "bash": "bash .github/hooks/scripts/audit-log.sh",
+        "powershell": "pwsh -File .github/hooks/scripts/audit-log.ps1",
+        "timeoutSec": 10
+      }
+    ]
+  }
+}

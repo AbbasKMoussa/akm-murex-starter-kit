@@ -1,0 +1,18 @@
+# Restricted paths — create/edit to a matching path is denied by the
+# restricted-path guard. One pattern per line. Lines are shell globs matched
+# against the full path, the file's basename, and as a directory prefix
+# (a trailing /** means "anything under this directory").
+#
+# Seed defaults below; the installer extends this from the "restricted areas"
+# collected during instruction-files setup.
+
+.git/**
+.agentic/audit/**
+secrets/**
+.env
+.env.*
+*.pem
+*.key
+id_rsa
+id_rsa.*
+credentials.json

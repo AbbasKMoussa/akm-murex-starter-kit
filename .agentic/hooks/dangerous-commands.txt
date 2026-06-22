@@ -1,0 +1,20 @@
+# Dangerous shell commands — one extended-regex per line, matched against the
+# shell command only. Patterns must be compatible with BOTH grep -E and .NET
+# regex: use \s and \b, not POSIX classes like [[:space:]]. Conservative by
+# design — deny only the clearly destructive; prefer false-negatives over
+# blocking legitimate work.
+
+# recursive force-remove of a root-ish path
+\brm\s+-[a-zA-Z]*r[a-zA-Z]*f?\b\s+(-[a-zA-Z]+\s+)*(/|~|\$HOME)(/\s*)?(\s|$)
+# force-push to a protected branch
+git\s+push\s+.*(--force|--force-with-lease|-f)\b.*\b(main|master|production|release)\b
+# fork bomb
+:\(\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:
+# pipe a remote script straight into a shell
+\b(curl|wget)\b[^|]*\|\s*(sudo\s+)?(ba)?sh\b
+# world-writable recursive chmod
+\bchmod\s+-R\s+0?777\b
+# filesystem / raw-device destruction
+\bmkfs(\.\w+)?\s
+\bdd\b.*\bof=/dev/(sd|nvme|disk)
+>\s*/dev/sd[a-z]

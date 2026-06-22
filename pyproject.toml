@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "murex-starter-kit"
+version = "0.1.0"
+description = "Bootstrap a repository for agentic coding with GitHub Copilot (VS Code + CLI)."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Proprietary" }
+
+[project.scripts]
+murex-starter-kit = "murex_starter_kit.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/murex_starter_kit"]

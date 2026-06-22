@@ -1,0 +1,9 @@
+# Local agent audit trail written by the audit-log hook — never commit.
+.agentic/audit/
+
+# Python build artifacts
+dist/
+build/
+*.egg-info/
+__pycache__/
+.venv/
