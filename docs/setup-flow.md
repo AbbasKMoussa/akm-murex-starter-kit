@@ -12,7 +12,7 @@ flow) is a separate, repeatable flow that builds on this.
 
 ## Delivery and bootstrap
 
-- **Installer:** `uvx murex-starter-kit init` (also `pipx`/`pip`). Source of
+- **Installer:** `uvx akmaestro init` (also `pipx`/`pip`). Source of
   truth is an internal git repo published to the internal Python registry. The
   installer is idempotent and re-runnable to upgrade.
 - **Bootstrap = the installer.** It lays down the kit flow-skills
@@ -27,7 +27,7 @@ flow) is a separate, repeatable flow that builds on this.
 
 All dynamic logic — detection, interview, generation, and section-aware merge —
 lives in the **skills** (run by the agent), not in the installer. `uvx
-murex-starter-kit init` only:
+akmaestro init` only:
 
 1. copies static assets from the package into the repo, and
 2. prints the one line that starts the flow ("now run `/init`").

@@ -24,7 +24,7 @@ automatically or invoked as `/<name>`.
    `setup-skills`, `setup-hooks`, and `doctor`
    (`.github/skills/doctor/SKILL.md`, a read-only health check with an opt-in
    `--fix` mode). These are laid down by the installer
-   (`uvx murex-starter-kit init`) as part of the bootstrap,
+   (`uvx akmaestro init`) as part of the bootstrap,
    *before* this topic runs, because the flow must exist for the flow to run.
    This topic only verifies they are present and valid.
 

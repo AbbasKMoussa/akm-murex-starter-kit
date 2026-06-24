@@ -1,6 +1,6 @@
-# Starter Kit Project Context
+# AKMaestro Project Context
 
-This repository is being designed as a Murex internal starter kit for helping teams adopt agentic coding workflows in their existing repositories.
+This repository builds **AKMaestro** ("conduct your agentic coding") — a Murex-internal kit for helping teams adopt agentic coding workflows in their existing repositories.
 
 ## Collaboration Rule
 
@@ -14,7 +14,7 @@ Target surfaces are GitHub Copilot only: VS Code and the Copilot CLI. Both read 
 
 The desired user experience is:
 
-1. A team lead runs the one-time installer in an existing repository (`uvx murex-starter-kit init`).
+1. A team lead runs the one-time installer in an existing repository (`uvx akmaestro init`).
 2. From then on, a developer opens Copilot (VS Code or CLI) and says "Let's run the initialization flow" (or uses `/init` in VS Code, the `init` agent in the CLI).
 3. The agent runs a guided setup flow, possibly across multiple sessions.
 4. The repository ends with agentic coding support installed and configured.
@@ -33,7 +33,7 @@ The setup flow should be dynamic, not a blind file copy. It should:
 
 The architecture is a one-time installer plus repo-local installed assets (BMAD-style):
 
-- the installer is a Python CLI run via `uvx murex-starter-kit init` (source of truth in an internal git repo, published to the internal Python registry); it is the bootstrap and lays down the in-agent flow;
+- the installer is a Python CLI run via `uvx akmaestro init` (source of truth in an internal git repo, published to the internal Python registry); it is the bootstrap and lays down the in-agent flow;
 - repo-local files such as `.github/copilot-instructions.md`, `AGENTS.md`, `.github/instructions/`, `.github/skills/` (agent skills, including the kit's own flows like `init`), optional `.github/hooks/`, and `.agentic/` state files.
 
 The kit's universal mechanism is **agent skills** (`.github/skills/<name>/SKILL.md`), an open standard that works identically in VS Code Copilot, Copilot CLI, and the cloud agent. The kit's flows ship as skills (so `/init` and natural language both work on every surface), and setup also installs a curated catalog of reusable skills for daily team use. See decisions 11–12 in `docs/setup-flow-decisions.md`.
@@ -54,7 +54,7 @@ Agreed initialization topics:
 
 ## Implementation status
 
-Stage 1 is implemented in `src/murex_starter_kit/`: a thin Python installer
+Stage 1 is implemented in `src/akmaestro/`: a thin Python installer
 (`cli.py` + `installer.py`) plus the installable assets under `assets/` — the
 seven skills (`init`, `setup-instructions`, `setup-tooling`, `setup-skills`,
 `setup-hooks`, `teach`, `doctor`), the hooks, and bootstrap templates. The
@@ -63,4 +63,13 @@ bundles the assets. Note: `.github/skills/{teach,doctor}` and `.github/hooks/` a
 the repo root are the original dogfood copies and now duplicate `assets/`; the
 canonical source is `assets/`. Not yet done: end-to-end run of `/init` in a real
 Copilot session, hook live-CLI/PowerShell verification, and registry publish.
-Stage 2 (feature flow) is not started.
+
+Stage 2 (feature flow) is implemented as 11 skills under `assets/skills/`:
+`feature` (orchestrator), `feature-understand`, `feature-frame`, `feature-split`,
+the five `story-*` loop steps, `feature-review`, and `feature-retro`. They install
+via the same thin installer (verified: all 18 skills bundle and install). Design
+lives in `docs/feature-flow.md` + `docs/feature-phases/`. Not yet done: end-to-end
+run in a real Copilot session (the skill procedures are unproven live, including
+orchestrator→step delegation and the autonomous-mode internal loop). These Stage 2
+skills exist only in `assets/` (no root dogfood copies, avoiding the Stage 1
+duplication).

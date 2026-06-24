@@ -1,4 +1,4 @@
-"""Command-line entry point: ``murex-starter-kit init``."""
+"""Command-line entry point: ``akmaestro init``."""
 
 from __future__ import annotations
 
@@ -10,8 +10,8 @@ from . import __version__, installer
 
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="murex-starter-kit",
-        description="Bootstrap a repository for agentic coding with GitHub Copilot.",
+        prog="akmaestro",
+        description="AKMaestro — set up a repo for agentic coding with GitHub Copilot.",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)

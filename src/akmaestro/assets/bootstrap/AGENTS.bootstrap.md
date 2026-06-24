@@ -1,6 +1,6 @@
 # AGENTS.md
 
-> This is a placeholder created by the Murex Starter Kit. Run `/init` (the
+> This is a placeholder created by AKMaestro. Run `/init` (the
 > initialization flow) to replace it with real, repo-specific instructions. The
 > `setup-instructions` skill fills in the sections below from detected facts and
 > your answers.

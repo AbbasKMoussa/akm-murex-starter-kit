@@ -3,15 +3,15 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "murex-starter-kit"
-version = "0.1.0"
-description = "Bootstrap a repository for agentic coding with GitHub Copilot (VS Code + CLI)."
+name = "akmaestro"
+version = "0.2.0"
+description = "AKMaestro — conduct your agentic coding: set up a repo for GitHub Copilot (VS Code + CLI) and drive features with a guided flow."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "Proprietary" }
 
 [project.scripts]
-murex-starter-kit = "murex_starter_kit.cli:main"
+akmaestro = "akmaestro.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/murex_starter_kit"]
+packages = ["src/akmaestro"]

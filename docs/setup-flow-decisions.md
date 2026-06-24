@@ -4,7 +4,7 @@ Date: 2026-06-19
 
 ## Context
 
-We are designing a Murex starter kit that lets teams add agentic coding support to existing repositories. The first major flow is the setup/initialization flow. A later flow will guide feature development from idea to feature spec to stories to write/implement/review cycles.
+We are designing AKMaestro, a Murex-internal kit that lets teams add agentic coding support to existing repositories. The first major flow is the setup/initialization flow. A later flow will guide feature development from idea to feature spec to stories to write/implement/review cycles.
 
 ## Desired Setup Outcome
 
@@ -31,7 +31,7 @@ The flow may span multiple sessions, so setup state must be persisted on disk.
 
    An uninitialized repository cannot know what "initialization flow" means, so something must lay down the flow first. That "something" is a single, versioned, idempotent installer rather than a magic global understanding. After it runs once, everything else is conversational.
 
-   - Distribution: a Python CLI run via `uvx murex-starter-kit init` (also installable with `pipx`/`pip`). This matches the existing `uv tool install graphifyy` idiom in the tooling topic.
+   - Distribution: a Python CLI run via `uvx akmaestro init` (also installable with `pipx`/`pip`). This matches the existing `uv tool install graphifyy` idiom in the tooling topic.
    - Source of truth: an internal git repo, published to the internal Python registry (PyPI / Artifactory).
    - The installer runs preflight detection, drives the interview, and lays down the repo-local Layer-1 assets. It is idempotent and re-runnable to upgrade.
 
@@ -147,7 +147,7 @@ The flow may span multiple sessions, so setup state must be persisted on disk.
 
 20. The installer is a thin file-dropper; logic lives in skills (decided).
 
-    `uvx murex-starter-kit init` only copies static assets and prints the line
+    `uvx akmaestro init` only copies static assets and prints the line
     that starts the flow. Detection, interview, generation, and section-merge are
     done by the skills at runtime. See the asset mapping in `docs/setup-flow.md`.
     MCP servers are explicitly out of scope for Stage 1.
@@ -260,6 +260,74 @@ the full Stage 1 layout and asset mapping are in `docs/setup-flow.md`.
 Resolved: min profile (decision 15), merge policy (decision 14), validation gate
 (decision 16), flow shape (decision 13).
 
-- What should the Stage 2 feature flow look like in detail — phases, per-phase
-  skills, state under `.agentic/features/` and `.agentic/stories/`, and how its
-  "update AI infra" steps feed back into Stage 1 assets (the `teach` skill)?
+- (Stage 2 is now being designed — see `docs/feature-flow.md` and the Stage 2
+  decisions below.)
+
+## Stage 2: Feature Flow Decisions
+
+S1. Stage 2 is a repeatable per-feature flow, BMAD-style but leaner, delivered as
+    skills + `.agentic/features/<id>/` state in the same kit. Assumes Stage 1 is
+    complete. See `docs/feature-flow.md`.
+
+S2. Working model: fresh context per step. Each step runs in its own Copilot
+    session; on finishing it tells the user to open a new context and run the next
+    command. Continuity is carried by on-disk state + artifacts, not conversation
+    history.
+
+S3. A `feature status` / `feature help` command always reports where you are and
+    the exact next command (BMAD-style orientation).
+
+S4. Gate every boundary. Every phase boundary and every story-step boundary is a
+    hard stop requiring explicit approval before the next step.
+
+S5. Phases: Phase 1 is two gated steps — Understand → Frame — then Split →
+    per-story loop (Prime → Plan → Implement → Review → Learn) → Feature review →
+    Retrospective. Per-step skills so each runs in its own context. Understand
+    comes first and treats the originating ticket as incomplete; Frame adapts to
+    whether the dev already has an idea (capture+pressure-test) or needs
+    brainstorming.
+
+S6. The loop feeds Stage 1: `/story-learn` and `/feature-retro` call `/teach` to
+    persist new conventions/pitfalls and flag new skills/hooks.
+
+S7. Each step is a curated specialist, carried by the skill (not Copilot custom
+    agents). Each step's `SKILL.md` embeds a named role persona + bundled
+    templates/checklists (BMAD role + dependencies); fresh-context-per-step makes
+    each step a focused specialist. We do NOT map 1:1 to BMAD's roster — a leaner
+    set (Framer, Planner, Researcher, Architect, Implementer, Reviewer,
+    Librarian, Retro facilitator) merges roles for max value at least complexity.
+    Skills keep cross-surface uniformity (decision 11) with no quality loss —
+    quality comes from curation + clean context, not the primitive.
+
+S8. Sources for understanding: codebase + Graphifyy + fetchable online sources
+    always; Jira/wiki are optional and credential-gated via a user-provided PAT +
+    base URL (environment variables / gitignored config) — otherwise the user
+    pastes the content. PATs are never committed. Deeper Jira/wiki integration may
+    later be an MCP server (revisits the Stage-1 MCP-out-of-scope decision).
+
+S9. Human-in-the-loop throughout (working-model principle 4). Steps are
+    collaborations, not agent monologues — specialists think out loud, ask, and
+    iterate during the step, and meet the user where they are: take+accept,
+    take+enhance, or push back with a reason and propose an alternative; only
+    propose from scratch when the user has nothing. Applies especially to Frame
+    (the dev's idea) and Split (the dev's story breakdown).
+
+S10. Stories are right-sized — not too small. Bias toward fewer, larger,
+     user-meaningful vertical slices; split only when a story is too big for one
+     Phase 3 loop. Story-level, never a task list.
+
+S12. Story review and feature review are distinct personas (corrects an earlier
+     "reuse the Reviewer" shortcut). Phase 3 = close-up code Reviewer (this slice
+     vs its plan); Phase 4 = QA / Integration reviewer at feature altitude
+     (cross-story integration, whole-feature AC, manual-verification guide).
+     Distinct framing + checklists stop the feature review from drifting into
+     re-reviewing story internals.
+
+S11. Two modes, scoped to the Phase 3 per-story loop ONLY. The loop runs either
+     autonomous (the five steps back-to-back in one session, ungated) or guided
+     (each step gated + fresh context). Phases 1, 2, 4, 5 are always gated
+     regardless of mode (S4 still holds for them). Mode is per-story, switchable,
+     shown in `feature status`; autonomous removes only the inside-the-loop stops
+     and does not auto-advance to the next story. Hooks still apply in both modes.
+
+Open Stage 2 questions are listed at the end of `docs/feature-flow.md`.
