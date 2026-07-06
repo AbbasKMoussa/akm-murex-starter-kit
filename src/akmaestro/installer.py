@@ -32,21 +32,23 @@ def init(target: str = ".", with_hooks: bool = True) -> Dict[str, List[str]]:
     # Skills (always): init, setup-*, teach, doctor.
     _copy_tree(ASSETS / "skills", root / ".github" / "skills", root, results)
 
-    # Hooks (optional topic; may be declined or disabled by policy).
+    # Hooks (optional topic; may be declined or disabled by policy). The audit
+    # dir and its gitignore entry only exist for the audit-log hook, so they
+    # are installed together.
     if with_hooks:
         _copy_tree(ASSETS / "hooks", root / ".github" / "hooks", root, results)
         _copy_tree(ASSETS / "hooks-data", root / ".agentic" / "hooks", root, results)
         _make_executable(root / ".github" / "hooks" / "scripts")
+        (root / ".agentic" / "audit").mkdir(parents=True, exist_ok=True)
+        _ensure_gitignore(root, results)
 
     # Bootstrap pointer files — only if absent.
     for src_rel, dst_rel in BOOTSTRAP:
         _copy_file(ASSETS / src_rel, root / dst_rel, root, results)
 
-    # Runtime state dirs (the skills write into these).
+    # Runtime state dir (the setup skills write into this).
     (root / ".agentic" / "setup").mkdir(parents=True, exist_ok=True)
-    (root / ".agentic" / "audit").mkdir(parents=True, exist_ok=True)
 
-    _ensure_gitignore(root, results)
     return results
 
 

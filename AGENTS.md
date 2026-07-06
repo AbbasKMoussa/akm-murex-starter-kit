@@ -58,10 +58,13 @@ Stage 1 is implemented in `src/akmaestro/`: a thin Python installer
 (`cli.py` + `installer.py`) plus the installable assets under `assets/` — the
 seven skills (`init`, `setup-instructions`, `setup-tooling`, `setup-skills`,
 `setup-hooks`, `teach`, `doctor`), the hooks, and bootstrap templates. The
-installer is tested (fresh/idempotent/no-overwrite/`--no-hooks`) and the wheel
-bundles the assets. Note: `.github/skills/{teach,doctor}` and `.github/hooks/` at
-the repo root are the original dogfood copies and now duplicate `assets/`; the
-canonical source is `assets/`. Not yet done: end-to-end run of `/init` in a real
+installer is tested (`tests/test_installer.py`, run by CI on Linux + Windows via
+`.github/workflows/ci.yml`; `uv run pytest` locally) and the wheel bundles the
+assets (CI verifies all 18 skills + hooks land in it). Note:
+`.github/skills/{teach,doctor}`, `.github/hooks/`, and `.agentic/hooks/` at the
+repo root are the original dogfood copies and duplicate `assets/`; the canonical
+source is `assets/`, and a test fails if the copies drift — change `assets/`
+first, then sync the root copies. Not yet done: end-to-end run of `/init` in a real
 Copilot session, hook live-CLI/PowerShell verification, and registry publish.
 
 Stage 2 (feature flow) is implemented as 11 skills under `assets/skills/`:

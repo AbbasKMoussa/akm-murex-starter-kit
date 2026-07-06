@@ -13,5 +13,11 @@ license = { text = "Proprietary" }
 [project.scripts]
 akmaestro = "akmaestro.cli:main"
 
+[dependency-groups]
+dev = ["pytest>=8"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/akmaestro"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

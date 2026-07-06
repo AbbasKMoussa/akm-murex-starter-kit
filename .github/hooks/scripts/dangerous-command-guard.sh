@@ -15,7 +15,7 @@
 set -u
 
 allow() { printf '{"permissionDecision":"allow"}\n'; exit 0; }
-deny()  { printf '%s' "$1" | jq -Rs '{permissionDecision:"deny",permissionDecisionReason:.}'; exit 0; }
+deny()  { printf '%s' "$1" | jq -Rsc '{permissionDecision:"deny",permissionDecisionReason:.}'; exit 0; }
 
 command -v jq >/dev/null 2>&1 || allow
 

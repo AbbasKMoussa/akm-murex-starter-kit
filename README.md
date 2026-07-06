@@ -17,9 +17,15 @@ BMAD-style flow — an orchestrator cueing a roster of specialist agents.
 - **GitHub Copilot** in VS Code or the Copilot CLI.
 - **`uv`** (to run the installer):
   ```bash
-  curl -LsSf https://astral.sh/uv/install.sh | sh   # macOS/Linux
+  curl -LsSf https://astral.sh/uv/install.sh | sh                  # macOS/Linux
   ```
-  (No `uv`? Use the `pipx run --spec git+… akmaestro init` form below.)
+  ```powershell
+  powershell -c "irm https://astral.sh/uv/install.ps1 | iex"       # Windows
+  ```
+  No `uv` and can't install it? `pipx` works too:
+  ```bash
+  pipx run --spec git+https://github.com/AbbasKMoussa/akm-murex-starter-kit.git akmaestro init
+  ```
 
 ## Install into a repo
 
@@ -39,6 +45,12 @@ becomes simply `uvx akmaestro init`.
 
 The installer is a thin file-dropper: it copies the kit's skills and hooks in,
 then tells you what to run next. It changes nothing else.
+
+> **Upgrading:** the installer never overwrites existing files, so re-running it
+> only adds files that are missing — it does **not** update skills already in
+> your repo. To take a newer version of a kit-owned file (anything under
+> `.github/skills/` or `.github/hooks/` you haven't customized), delete it and
+> re-run `init`; review the diff before committing.
 
 ## Important: open a fresh Copilot session
 

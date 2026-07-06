@@ -15,7 +15,7 @@
 set -u
 
 allow() { printf '{"permissionDecision":"allow"}\n'; exit 0; }
-deny()  { printf '%s' "$1" | jq -Rs '{permissionDecision:"deny",permissionDecisionReason:.}'; exit 0; }
+deny()  { printf '%s' "$1" | jq -Rsc '{permissionDecision:"deny",permissionDecisionReason:.}'; exit 0; }
 
 # jq is required for safe field parsing. If absent, allow (never error out).
 command -v jq >/dev/null 2>&1 || allow
