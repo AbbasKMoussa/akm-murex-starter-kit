@@ -70,7 +70,9 @@ Alternatives considered: <1-line each, why not>
 
 Iterate until the user approves `feature.md`. On approval: set `phase: "framed"`,
 `lastApprovedGate: "frame"`, `nextCommand: "/feature-split"`; tell the user to
-open a new session and run **`/feature-split`**.
+open a new session and run **`/feature-split`** — or, if this session is still
+light (short history, few files read), offer to continue with `/feature-split`
+right here.
 
 ## Completion
 

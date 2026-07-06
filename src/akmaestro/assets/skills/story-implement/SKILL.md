@@ -48,7 +48,8 @@ Set the story `status: implemented`.
 
 - **guided** — present the change + test results; iterate until the user approves;
   set `currentStep: "review"`, `nextCommand: "/story-review"`; tell them to open a
-  new session and run it.
+  new session and run it. No light-context exception at this gate: review deserves
+  fresh, unbiased eyes, so always hand off to a new session.
 - **autonomous** — proceed to Review in this session.
 
 ## Completion

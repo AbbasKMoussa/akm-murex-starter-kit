@@ -55,7 +55,9 @@ Agreed initialization topics:
 ## Implementation status
 
 Stage 1 is implemented in `src/akmaestro/`: a thin Python installer
-(`cli.py` + `installer.py`) plus the installable assets under `assets/` — the
+(`cli.py` + `installer.py`, commands `init` and `update` — `update` refreshes
+kit-owned files via the sha256 manifest in `.agentic/setup/kit-manifest.json`
+and never touches customized files) plus the installable assets under `assets/` — the
 seven skills (`init`, `setup-instructions`, `setup-tooling`, `setup-skills`,
 `setup-hooks`, `teach`, `doctor`), the hooks, and bootstrap templates. The
 installer is tested (`tests/test_installer.py`, run by CI on Linux + Windows via

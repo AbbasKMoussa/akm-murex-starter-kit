@@ -51,7 +51,8 @@ Sends back to: <plan | implement>   # if send-back
 ## Gate / continue
 
 - **guided** — present the review; on pass set `currentStep: "learn"`,
-  `nextCommand: "/story-learn"`; tell them to open a new session and run it. On
+  `nextCommand: "/story-learn"`; tell them to open a new session and run it (or,
+  if this session is still light, offer to continue with Learn right here). On
   send-back, point to the step to redo.
 - **autonomous** — on pass, proceed to Learn in this session.
 

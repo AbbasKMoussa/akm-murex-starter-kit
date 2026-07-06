@@ -105,6 +105,107 @@ def test_cli_init_reports_and_exits_zero(tmp_path, capsys):
     assert (tmp_path / ".github" / "skills" / "doctor" / "SKILL.md").is_file()
 
 
+def _manifest(tmp_path):
+    return json.loads((tmp_path / ".agentic" / "setup" / "kit-manifest.json").read_text())
+
+
+def test_init_writes_manifest(tmp_path):
+    installer.init(str(tmp_path))
+    manifest = _manifest(tmp_path)
+    assert manifest["files"][".github/skills/init/SKILL.md"]
+    assert all("\\" not in key for key in manifest["files"])  # posix keys on all OSes
+
+
+def test_update_refreshes_kit_owned_but_keeps_customized(tmp_path):
+    installer.init(str(tmp_path))
+    kit_owned = tmp_path / ".github" / "skills" / "doctor" / "SKILL.md"
+    customized = tmp_path / ".github" / "skills" / "teach" / "SKILL.md"
+    original = kit_owned.read_bytes()
+    kit_owned.write_bytes(b"pretend this is an OLD kit version\n")
+    # Simulate: the old version is what the kit installed (manifest matches it).
+    mpath = tmp_path / ".agentic" / "setup" / "kit-manifest.json"
+    manifest = json.loads(mpath.read_text())
+    manifest["files"][".github/skills/doctor/SKILL.md"] = installer._sha256(
+        kit_owned.read_bytes()
+    )
+    mpath.write_text(json.dumps(manifest))
+    customized.write_text("my team's custom teach skill\n", encoding="utf-8")
+
+    results = installer.update(str(tmp_path))
+
+    assert kit_owned.read_bytes() == original
+    assert ".github/skills/doctor/SKILL.md" in results["updated"]
+    assert customized.read_text(encoding="utf-8") == "my team's custom teach skill\n"
+    assert ".github/skills/teach/SKILL.md" in results["kept"]
+
+
+def test_update_force_overwrites_customized(tmp_path):
+    installer.init(str(tmp_path))
+    customized = tmp_path / ".github" / "skills" / "teach" / "SKILL.md"
+    customized.write_text("custom\n", encoding="utf-8")
+
+    results = installer.update(str(tmp_path), force=True)
+
+    assert customized.read_text(encoding="utf-8") != "custom\n"
+    assert ".github/skills/teach/SKILL.md" in results["updated"]
+
+
+def test_update_adds_files_new_in_this_version(tmp_path):
+    installer.init(str(tmp_path))
+    removed = tmp_path / ".github" / "skills" / "feature" / "SKILL.md"
+    removed.unlink()  # as if installed by an older kit without this skill
+
+    results = installer.update(str(tmp_path))
+
+    assert removed.is_file()
+    assert ".github/skills/feature/SKILL.md" in results["created"]
+
+
+def test_update_keeps_files_with_unknown_provenance(tmp_path):
+    """A repo installed before the manifest existed: differing files are kept."""
+    installer.init(str(tmp_path))
+    (tmp_path / ".agentic" / "setup" / "kit-manifest.json").unlink()
+    target = tmp_path / ".github" / "skills" / "doctor" / "SKILL.md"
+    target.write_text("edited before manifests existed\n", encoding="utf-8")
+
+    results = installer.update(str(tmp_path))
+
+    assert target.read_text(encoding="utf-8") == "edited before manifests existed\n"
+    assert ".github/skills/doctor/SKILL.md" in results["kept"]
+    # Untouched files are adopted into the fresh manifest as up-to-date.
+    assert ".github/skills/init/SKILL.md" in results["up_to_date"]
+
+
+def test_update_respects_no_hooks_install(tmp_path):
+    installer.init(str(tmp_path), with_hooks=False)
+
+    results = installer.update(str(tmp_path))
+
+    assert not (tmp_path / ".github" / "hooks").exists()
+    assert not any("hooks" in f for f in results["created"])
+
+
+def test_update_never_touches_a_filled_in_agents_md(tmp_path):
+    installer.init(str(tmp_path))
+    agents = tmp_path / "AGENTS.md"
+    agents.write_text("# Real instructions written by /init\n", encoding="utf-8")
+
+    installer.update(str(tmp_path))
+
+    assert agents.read_text(encoding="utf-8") == "# Real instructions written by /init\n"
+
+
+def test_cli_update_reports_and_exits_zero(tmp_path, capsys):
+    installer.init(str(tmp_path))
+    (tmp_path / ".github" / "skills" / "teach" / "SKILL.md").write_text("custom\n")
+
+    rc = cli.main(["update", "--path", str(tmp_path)])
+
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "kept 1 customized" in out
+
+
 def test_dogfood_copies_match_assets():
     """The repo-root .github/skills/{teach,doctor} and .github/hooks are dogfood
     copies of assets/ (the canonical source, per AGENTS.md). Guard against drift."""

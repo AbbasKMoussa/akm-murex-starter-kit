@@ -50,8 +50,9 @@ Closing a story is a hard stop in **both** modes. Present the completed story
 (primer, plan, change, review, learnings). Then update `state.json`:
 
 - more stories remain → `currentStory` = next, `currentStep: "prime"`,
-  `nextCommand: "/story-prime"`; tell the user to open a new session and run it.
-  Autonomous does **not** auto-advance to the next story.
+  `nextCommand: "/story-prime"`; tell the user to open a new session and run it
+  (or, if this session is still light, offer to start the next story's Prime
+  right here). Autonomous does **not** auto-advance to the next story.
 - all stories done → `phase: "story-loop-done"`, `nextCommand: "/feature-review"`.
 
 ## Completion

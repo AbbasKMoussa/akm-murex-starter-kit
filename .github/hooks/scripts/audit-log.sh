@@ -26,8 +26,10 @@ if command -v jq >/dev/null 2>&1; then
     }' >> "$file" 2>/dev/null \
   || printf '{"received_at":"%s","raw_unparsed":true}\n' "$ts" >> "$file" 2>/dev/null
 else
-  oneline="$(printf '%s' "$payload" | tr -d '\r\n')"
-  printf '{"received_at":"%s","raw":%s}\n' "$ts" "${oneline:-null}" >> "$file" 2>/dev/null
+  # No jq: escape the payload into a JSON string by hand (strip control chars,
+  # escape backslash and quote) so every trail line is still valid JSON.
+  escaped="$(printf '%s' "$payload" | tr -d '\000-\037' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
+  printf '{"received_at":"%s","raw_escaped":"%s"}\n' "$ts" "$escaped" >> "$file" 2>/dev/null
 fi
 
 exit 0
