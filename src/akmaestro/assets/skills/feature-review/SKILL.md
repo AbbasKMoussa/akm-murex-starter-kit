@@ -66,7 +66,8 @@ and the expected result for each.
 Present `review.md`. If issues block the feature, reopen the relevant story's loop.
 On approval: set `phase: "reviewed"`, `lastApprovedGate: "feature-review"`,
 `nextCommand: "/feature-retro"`; tell the user to open a new session and run
-**`/feature-retro`**.
+**`/feature-retro`** — or, if this session is still light (short history, few
+files read), offer to continue with `/feature-retro` right here.
 
 ## Completion
 

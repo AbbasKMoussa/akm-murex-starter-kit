@@ -1,4 +1,4 @@
-"""Command-line entry point: ``akmaestro init``."""
+"""Command-line entry point: ``akmaestro init`` / ``akmaestro update``."""
 
 from __future__ import annotations
 
@@ -20,15 +20,27 @@ def main(argv: Optional[List[str]] = None) -> int:
     p_init.add_argument("--path", default=".", help="Target repository root (default: cwd)")
     p_init.add_argument("--no-hooks", action="store_true", help="Do not install hooks")
 
+    p_update = sub.add_parser(
+        "update",
+        help="Refresh kit-owned files to this kit version (customized files are kept)",
+    )
+    p_update.add_argument("--path", default=".", help="Target repository root (default: cwd)")
+    p_update.add_argument(
+        "--force",
+        action="store_true",
+        help="Also overwrite customized files and files the kit cannot attribute to itself",
+    )
+
     args = parser.parse_args(argv)
 
     if args.command == "init":
-        results = installer.init(target=args.path, with_hooks=not args.no_hooks)
-        _report(results)
+        _report_init(installer.init(target=args.path, with_hooks=not args.no_hooks))
+    elif args.command == "update":
+        _report_update(installer.update(target=args.path, force=args.force))
     return 0
 
 
-def _report(results) -> None:
+def _report_init(results) -> None:
     for f in results["created"]:
         print(f"  + {f}")
     for f in results["skipped"]:
@@ -42,6 +54,24 @@ def _report(results) -> None:
     print("Next: open Copilot (VS Code or CLI) at the repo root and run:")
     print("    /init")
     print('or say: "let\'s run the initialization flow".')
+
+
+def _report_update(results) -> None:
+    for f in results["updated"]:
+        print(f"  ~ {f} (updated)")
+    for f in results["created"]:
+        print(f"  + {f} (new in this kit version)")
+    for f in results["kept"]:
+        print(f"  ! {f} (customized or unknown origin — kept; use --force or delete it and re-run)")
+    print()
+    print(
+        f"Updated {len(results['updated'])}, added {len(results['created'])}, "
+        f"kept {len(results['kept'])} customized; "
+        f"{len(results['up_to_date'])} already up to date."
+    )
+    if results["updated"] or results["created"]:
+        print()
+        print("Review the diff, then open a fresh Copilot session to pick up the changes.")
 
 
 if __name__ == "__main__":

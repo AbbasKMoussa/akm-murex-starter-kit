@@ -17,9 +17,15 @@ BMAD-style flow — an orchestrator cueing a roster of specialist agents.
 - **GitHub Copilot** in VS Code or the Copilot CLI.
 - **`uv`** (to run the installer):
   ```bash
-  curl -LsSf https://astral.sh/uv/install.sh | sh   # macOS/Linux
+  curl -LsSf https://astral.sh/uv/install.sh | sh                  # macOS/Linux
   ```
-  (No `uv`? Use the `pipx run --spec git+… akmaestro init` form below.)
+  ```powershell
+  powershell -c "irm https://astral.sh/uv/install.ps1 | iex"       # Windows
+  ```
+  No `uv` and can't install it? `pipx` works too:
+  ```bash
+  pipx run --spec git+https://github.com/AbbasKMoussa/akm-murex-starter-kit.git akmaestro init
+  ```
 
 ## Install into a repo
 
@@ -39,6 +45,23 @@ becomes simply `uvx akmaestro init`.
 
 The installer is a thin file-dropper: it copies the kit's skills and hooks in,
 then tells you what to run next. It changes nothing else.
+
+### Upgrading an already-set-up repo
+
+`init` never overwrites existing files, so re-running it does not pick up new
+kit versions. Use `update` instead:
+
+```bash
+uvx --refresh --from git+https://github.com/AbbasKMoussa/akm-murex-starter-kit.git akmaestro update
+```
+
+`update` refreshes **kit-owned** files only: a file is overwritten only when it
+is still byte-identical to what the kit installed (tracked via
+`.agentic/setup/kit-manifest.json`). Anything you customized — a tweaked skill,
+your `restricted-paths.txt`, your filled-in `AGENTS.md` — is kept and listed, so
+nothing you wrote is ever lost. `--force` overrides that for a file you want
+reset to the kit version. Review the diff, commit, and open a fresh Copilot
+session.
 
 ## Important: open a fresh Copilot session
 
@@ -90,7 +113,9 @@ How it behaves:
 - **Fresh context per step.** Each step finishes by saving state and telling you
   the next command to run **in a new session** — continuity lives on disk
   (`.agentic/features/<id>/`), not in chat history. Ask `/feature` "where are we?"
-  any time to re-orient.
+  any time to re-orient. When the current session is still light, a step may
+  offer to continue right there instead (never between implement and review —
+  review gets fresh eyes).
 - **Gated boundaries.** Every phase boundary is a hard stop for your approval.
 - **Two modes for the per-story loop only:** *guided* (each of the five steps
   gated, in its own session) or *autonomous* (the five steps run back-to-back in

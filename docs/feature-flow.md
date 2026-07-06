@@ -16,6 +16,12 @@ Three principles drive the whole flow:
    to open a new session/context and run the next command. Continuity is carried
    by on-disk **state + artifacts**, never by conversation history. This keeps
    each step focused and avoids context bloat.
+
+   *Light-context exception:* the rule guards context quality, not ceremony. At a
+   gate, if the current session is still light (short history, few files read),
+   the step may offer to continue with the next command in the same session. The
+   one boundary where this never applies is implement → review, where a fresh
+   session is the point: the reviewer must not inherit the implementer's context.
 2. **Status/help always available.** `feature status` tells you exactly where you
    are — current feature, phase, story, what's done, and the precise next command
    to run in the new context. `feature help` explains the flow. (This is the

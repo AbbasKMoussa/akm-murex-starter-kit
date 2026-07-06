@@ -74,7 +74,9 @@ This is a collaboration (HITL) — think out loud and iterate with the user.
 Iterate until the user confirms it reflects reality and open questions are
 answered or explicitly deferred. On approval: set `phase: "understood"`,
 `lastApprovedGate: "understand"`, `nextCommand: "/feature-frame"` in `state.json`;
-tell the user to open a new session and run **`/feature-frame`**.
+tell the user to open a new session and run **`/feature-frame`** — or, if this
+session is still light (short history, few files read), offer to continue with
+`/feature-frame` right here.
 
 ## Completion
 

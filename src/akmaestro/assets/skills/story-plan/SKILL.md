@@ -51,7 +51,8 @@ Set the story `status: planned`.
 
 - **guided** — present the plan; iterate until the user approves; set
   `currentStep: "implement"`, `nextCommand: "/story-implement"`; tell them to open
-  a new session and run it.
+  a new session and run it (or, if this session is still light, offer to continue
+  with Implement right here).
 - **autonomous** — proceed to Implement in this session.
 
 ## Completion

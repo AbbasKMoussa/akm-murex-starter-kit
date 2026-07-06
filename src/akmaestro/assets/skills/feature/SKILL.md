@@ -75,6 +75,11 @@ Review → Learn) → 4 Feature review → 5 Retro.
   *guided* (each step gated, fresh context) or *autonomous* (the 5 steps run
   back-to-back in one session, ungated, surfacing only real blockers). Hooks apply
   in both modes. Autonomous never auto-advances to the next story.
+- **Light-context exception:** the fresh-session rule guards context quality, not
+  ceremony. At a gate, if the current session is still light (short history, few
+  files read), the step may offer to continue with the next command right here.
+  The one boundary where it never applies is implement → review: review deserves
+  fresh, unbiased eyes.
 - Each step skill ends by writing state + printing the next command, so `feature
   status` and the step output always agree.
 

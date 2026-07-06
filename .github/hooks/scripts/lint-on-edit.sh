@@ -45,5 +45,5 @@ out="$(eval "$cmd" 2>&1)"; status=$?
 [ "$status" -eq 0 ] && noop   # clean: nothing to inject
 
 printf '%s' "Lint findings for $path (exit $status):
-$out" | jq -Rs '{additionalContext: .}'
+$out" | jq -Rsc '{additionalContext: .}'
 exit 0

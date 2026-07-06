@@ -71,7 +71,8 @@ AC→story coverage map — and iterate until approved. On approval: write the s
 files, update `feature.md`, set `phase: "split"`, the ordered `stories` list with
 `status`, `currentStory: "01-<slug>"`, `lastApprovedGate: "split"`,
 `nextCommand: "/story-prime"`; tell the user to open a new session and run
-**`/story-prime`**.
+**`/story-prime`** — or, if this session is still light (short history, few
+files read), offer to continue with `/story-prime` right here.
 
 ## Completion
 

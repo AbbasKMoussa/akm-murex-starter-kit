@@ -1,4 +1,8 @@
-# Testing AKMaestro (v0.2.0)
+# Testing AKMaestro (v0.3.0)
+
+> For a structured, agent-driven live verification session (recommended), see
+> [`copilot-manual-test/README.md`](copilot-manual-test/README.md) — it walks
+> Copilot itself through the checks and produces a results file to send back.
 
 Help us validate Stage 1 (the one-time setup flow). This is early — the installer
 is tested, but the *skills running inside Copilot* are the unproven part, which

@@ -55,7 +55,8 @@ Set the story `status: primed`.
 ## Gate / continue
 
 - **guided** — confirm the primer with the user, set `currentStep: "plan"`,
-  `nextCommand: "/story-plan"`; tell them to open a new session and run it.
+  `nextCommand: "/story-plan"`; tell them to open a new session and run it (or,
+  if this session is still light, offer to continue with Plan right here).
 - **autonomous** — proceed directly to the Plan step in this session.
 
 ## Completion
