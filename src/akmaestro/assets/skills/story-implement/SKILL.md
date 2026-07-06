@@ -30,6 +30,11 @@ no approved plan (guided), send back to `/story-plan`.
 - Run the story's tests and the relevant build/test commands from `AGENTS.md`.
   Record results; if the environment can't run them, record `blocked` + reason
   (don't silently skip).
+- **Cross-repo stories:** changes in an editable dependency follow *that* repo's
+  `AGENTS.md` (build and test there too, dependency-side contract first) and are
+  committed in the dependency repo referencing this feature id. Never modify a
+  read-only dependency — the boundary guard denies it; if a change there turns
+  out to be required, stop: that's a genuine blocker to surface.
 - Keep changes scoped to this story; reuse existing patterns in the area.
 
 ## Output: append Change notes to the story file

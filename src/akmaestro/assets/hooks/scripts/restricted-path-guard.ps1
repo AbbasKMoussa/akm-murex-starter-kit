@@ -2,8 +2,15 @@
 #
 # STATUS: DRAFT, NOT YET FIRED AGAINST A LIVE COPILOT CLI. See the .sh variant.
 #
-# SAFETY: always exit 0; default to allow on any uncertainty; deny only on a
-# positive match against a glob in .agentic/hooks/restricted-paths.txt.
+# Two rules, in order:
+#   1. Workspace boundary — edits resolving OUTSIDE the repository root are
+#      denied unless under a path declared in .agentic/hooks/editable-paths.txt.
+#   2. Restricted globs — edits matching .agentic/hooks/restricted-paths.txt are
+#      denied, in-repo and inside editable satellites alike.
+#
+# SAFETY: always exit 0; default to allow on any parsing uncertainty; deny only
+# on a positive match (a restricted glob, or a path positively outside the
+# declared workspace).
 
 $ErrorActionPreference = 'SilentlyContinue'
 
@@ -11,6 +18,41 @@ function Allow { '{"permissionDecision":"allow"}'; exit 0 }
 function Deny([string]$reason) {
   (@{ permissionDecision = 'deny'; permissionDecisionReason = $reason } | ConvertTo-Json -Compress)
   exit 0
+}
+
+function Normalize([string]$p) {
+  if (-not [System.IO.Path]::IsPathRooted($p)) {
+    $p = Join-Path (Get-Location).Path $p
+  }
+  # GetFullPath resolves '.' and '..' textually; it does not require the path
+  # to exist and does not resolve symlinks.
+  return [System.IO.Path]::GetFullPath($p).TrimEnd([System.IO.Path]::DirectorySeparatorChar)
+}
+
+# Deny if $rel (forward-slash path relative to its repo/satellite root) matches
+# a restricted glob: full-path match, basename match, directory-prefix match.
+function Test-RestrictedGlobs([string]$rel) {
+  $globsFile = '.agentic/hooks/restricted-paths.txt'
+  if (-not (Test-Path $globsFile)) { return }
+  $bn = Split-Path $rel -Leaf
+  foreach ($glob in Get-Content $globsFile) {
+    $g = $glob.Trim()
+    if ($g -eq '' -or $g.StartsWith('#')) { continue }
+    $g = $g -replace '^\./', ''
+    $base = ($g -replace '/\*\*$', '') -replace '/$', ''
+
+    if (($rel -like $g) -or ($bn -like $g)) {
+      Deny "Edit to '$rel' is blocked by the restricted-path guard (matched '$g'). Get approval before changing this path."
+    }
+    if ($base -ne '' -and ($rel -eq $base -or $rel -like "$base/*")) {
+      Deny "Edit to '$rel' is blocked by the restricted-path guard (inside restricted dir '$base'). Get approval before changing this path."
+    }
+  }
+}
+
+function To-Rel([string]$abs, [string]$root) {
+  $rel = $abs.Substring($root.Length).TrimStart('\', '/')
+  return $rel -replace '\\', '/'
 }
 
 try {
@@ -29,24 +71,33 @@ try {
   if (-not $path) { Allow }
   $path = $path -replace '^\./', ''
 
-  $globsFile = '.agentic/hooks/restricted-paths.txt'
-  if (-not (Test-Path $globsFile)) { Allow }
+  $root = Normalize '.'
+  $abs = Normalize $path
+  if ($null -eq $abs -or $abs -eq '') { Allow }
 
-  foreach ($glob in Get-Content $globsFile) {
-    $g = $glob.Trim()
-    if ($g -eq '' -or $g.StartsWith('#')) { continue }
-    $g = $g -replace '^\./', ''
-    $base = ($g -replace '/\*\*$', '') -replace '/$', ''
-    $bn = Split-Path $path -Leaf
+  # Inside the repository: restricted globs on the repo-relative path.
+  if ($abs -eq $root -or $abs.StartsWith($root + [System.IO.Path]::DirectorySeparatorChar) -or $abs.StartsWith($root + '/')) {
+    Test-RestrictedGlobs (To-Rel $abs $root)
+    Allow
+  }
 
-    if (($path -like $g) -or ($bn -like $g)) {
-      Deny "Edit to '$path' is blocked by the restricted-path guard (matched '$g'). Get approval before changing this path."
-    }
-    if ($base -ne '' -and ($path -eq $base -or $path -like "$base/*")) {
-      Deny "Edit to '$path' is blocked by the restricted-path guard (inside restricted dir '$base'). Get approval before changing this path."
+  # Outside the repository: allowed only under a declared editable dependency,
+  # with the restricted globs still applied inside it.
+  $editsFile = '.agentic/hooks/editable-paths.txt'
+  if (Test-Path $editsFile) {
+    foreach ($entry in Get-Content $editsFile) {
+      $e = $entry.Trim()
+      if ($e -eq '' -or $e.StartsWith('#')) { continue }
+      $base = Normalize $e
+      if ($null -eq $base -or $base -eq '' -or $base -eq [System.IO.Path]::GetPathRoot($base)) { continue }
+      if ($abs -eq $base -or $abs.StartsWith($base + [System.IO.Path]::DirectorySeparatorChar) -or $abs.StartsWith($base + '/')) {
+        Test-RestrictedGlobs (To-Rel $abs $base)
+        Allow
+      }
     }
   }
-  Allow
+
+  Deny "Edit to '$path' is blocked: it resolves outside this repository and is not under a declared editable dependency. Owned sibling repos belong in .agentic/hooks/editable-paths.txt; read-only reference repos must not be edited."
 } catch {
   Allow
 }

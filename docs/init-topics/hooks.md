@@ -102,7 +102,7 @@ All four are config-driven: the installer writes machine-readable data into
 
 | Hook | Event | Matcher | Behavior | Config data |
 | --- | --- | --- | --- | --- |
-| Restricted-path guard | `preToolUse` | `create\|edit` | Deny when the target file path matches a restricted glob. | `.agentic/hooks/restricted-paths.txt` |
+| Restricted-path guard | `preToolUse` | `create\|edit` | Deny when the target resolves outside the workspace (repo + declared editable deps), or matches a restricted glob. | `.agentic/hooks/restricted-paths.txt`, `.agentic/hooks/editable-paths.txt` |
 | Dangerous-command guard | `preToolUse` | `bash\|powershell` | Deny when the shell `command` matches a destructive pattern (`rm -rf`, force-push to a protected branch, `curl … \| sh`, `chmod -R 777`, …). | `.agentic/hooks/dangerous-commands.txt` |
 | Audit log | `userPromptSubmitted`, `postToolUse`, `sessionEnd` | — | Append one JSON line per event to a local audit trail. Never blocks. | — |
 | Lint-on-edit | `postToolUse` | `create\|edit` | Run the configured linter on the changed file and inject results as context (postToolUse can inform, not block). No-op if no lint command is configured. | `.agentic/hooks/lint-commands.json` |
@@ -115,6 +115,16 @@ topic collects, but stored machine-readably in
 rule into an enforced one. The script reads the edit target path from `toolArgs`
 (checking the likely field names defensively), matches against the globs, and
 denies with a clear reason on a positive match — otherwise allows.
+
+It also enforces the **workspace boundary**: the target path is normalized to an
+absolute path, and anything resolving *outside* the repository root is denied
+unless it is under a path declared in `.agentic/hooks/editable-paths.txt` — the
+owned sibling repos ("editable satellites") collected during the instruction
+interview. Read-only reference repos are never listed, which is exactly what
+keeps them read-only. The restricted globs are applied inside editable
+satellites too (relative to the satellite root), so `.env`, `*.pem`, `secrets/`
+etc. stay protected there. Both rules deny only on a positive match and the
+scripts still always exit 0.
 
 ### Dangerous-command guard
 

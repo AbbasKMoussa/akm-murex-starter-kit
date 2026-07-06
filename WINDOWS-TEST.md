@@ -34,7 +34,7 @@ Goal: confirm `akmaestro init` works on Windows and lays files down correctly.
 - `.github\skills\` contains **18** skill folders (each with `SKILL.md`).
 - `.github\hooks\scripts\` contains the four `*.ps1` files.
 - `.agentic\hooks\` contains `restricted-paths.txt`, `dangerous-commands.txt`,
-  `lint-commands.json`.
+  `editable-paths.txt`, `lint-commands.json`.
 - `.gitignore` exists and contains `.agentic/audit/`.
 - `AGENTS.md` was created (placeholder).
 
@@ -42,7 +42,12 @@ Record the skill count and whether each expected path exists.
 
 ---
 
-## Phase B — PowerShell hook unit tests (the main event)
+## Phase B — PowerShell hook unit tests
+
+> Note: since v0.4.0 these script-logic checks (plus the workspace-boundary
+> cases) also run automatically in CI via `pwsh` on Linux and Windows
+> (`tests/test_installer.py`). Phase B remains useful as a manual smoke check;
+> Phase C (live Copilot) is what CI cannot cover.
 
 Run from **inside `akm-scratch`**. Each test pipes a JSON event to a guard script
 and checks the printed decision. Use `-ExecutionPolicy Bypass` so local scripts

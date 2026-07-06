@@ -88,8 +88,17 @@ Only ask follow-up questions when the answer is incomplete or has direct setup c
 ## Repository Context
 
 - This repository is: <main repo / part of multi-repo system>.
-- Related repositories:
-  - <repo>: <when agents should consider it>
+
+## Workspace & Dependencies
+
+- `<../dep-path>` — **editable** (we own it; functionally part of this
+  application). May be changed as part of work here; follow its own `AGENTS.md`;
+  changes reach this repo via <link / version bump / rebuild>. Also listed in
+  `.agentic/hooks/editable-paths.txt` so the boundary guard permits edits.
+- `<../other-dep>` — **read-only reference** (another team's code). Consult it
+  to understand behavior (its Graphifyy graph first, code when needed); never
+  edit; a needed change there is an external dependency to raise with its
+  owners, not a story.
 
 ## Stack
 

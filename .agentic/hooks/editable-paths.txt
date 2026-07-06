@@ -1,0 +1,13 @@
+# Editable dependency paths ("editable satellites") — one per line, relative to
+# the repo root (e.g. ../lib-b) or absolute.
+#
+# The restricted-path guard denies any create/edit that resolves OUTSIDE this
+# repository unless the target is under one of these paths. List only sibling
+# repos your team owns and treats as functionally part of this application.
+# Read-only reference repos (code you consult but do not own) must NOT be
+# listed — that is exactly what the boundary protects.
+#
+# Restricted globs (restricted-paths.txt) still apply inside listed paths, so
+# .env, *.pem, secrets/ etc. stay protected in satellites too.
+#
+# Populated during /init from the "workspace & dependencies" interview.

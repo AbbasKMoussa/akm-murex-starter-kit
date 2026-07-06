@@ -27,7 +27,8 @@ whether `jq` is on PATH (`jq --version`).
 2. `.github/hooks/hooks.json` exists; `.github/hooks/scripts/` has 4 `.sh` + 4
    `.ps1` files; on macOS/Linux the `.sh` files are executable.
 3. `.agentic/hooks/` has `restricted-paths.txt`, `dangerous-commands.txt`,
-   `lint-commands.json`; `.agentic/setup/kit-manifest.json` exists.
+   `editable-paths.txt`, `lint-commands.json`; `.agentic/setup/kit-manifest.json`
+   exists.
 4. `AGENTS.md` exists (placeholder) and `.gitignore` contains `.agentic/audit/`.
 
 **Expected:** all present. Record the actual skill count.
@@ -60,7 +61,7 @@ looks wrong, especially in the Hooks section.
 
 First ask the human whether hooks are enabled on this surface (VS Code agent
 hooks are preview and may be disabled by org policy; the CLI has them GA). If
-they cannot be enabled, mark 8–11 SKIPPED with the reason and go to Phase 4.
+they cannot be enabled, mark 8–13 SKIPPED with the reason and go to Phase 4.
 
 > Safety by design: every probe below is harmless even if **no** hook fires.
 > Do not use real destructive commands to test the guard.
@@ -79,14 +80,24 @@ they cannot be enabled, mark 8–11 SKIPPED with the reason and go to Phase 4.
     Then run the shell command `echo AKM_GUARD_TEST`. **Expected:** blocked by
     the dangerous-command guard. (If no hook fires it just echoes — harmless;
     record FAIL.) Remove the sentinel line afterwards.
-11. **Lint hook silence.** After the `notes.md` edit, confirm nothing lint-ish
+11. **Workspace boundary — deny.** Try to create `../akm-boundary-probe/x.txt`
+    (a sibling of this repo). **Expected:** blocked — the path resolves outside
+    the repository and no editable dependency is declared. (If no hook fires, a
+    stray sibling folder appears — delete it and record FAIL.)
+12. **Workspace boundary — editable satellite allow.** Create a sibling repo
+    `../akm-lib-b/` (plain `mkdir`), append the line `../akm-lib-b` to
+    `.agentic/hooks/editable-paths.txt`, then try to create
+    `../akm-lib-b/mod.py`. **Expected:** allowed. Also try
+    `../akm-lib-b/.env` — **Expected:** denied (restricted globs apply inside
+    satellites). Clean up `../akm-lib-b/` and the added line afterwards.
+13. **Lint hook silence.** After the `notes.md` edit, confirm nothing lint-ish
     was injected (no lint command is configured for `.md`). **Expected:** no-op.
 
 ## Phase 4 — Audit trail: capture the real payloads
 
-12. Check `.agentic/audit/` for a `<date>.jsonl` file. **Expected:** if hooks
+14. Check `.agentic/audit/` for a `<date>.jsonl` file. **Expected:** if hooks
     are enabled, it exists and grew during Phase 3.
-13. From the `.jsonl` lines, extract and report the **real payload shape** —
+15. From the `.jsonl` lines, extract and report the **real payload shape** —
     this is the data we need to validate the guards' field guesses:
     - the event names seen (`hook_event_name` / `hookEventName` values);
     - the tool names Copilot uses for file edits and shell commands;
@@ -100,7 +111,7 @@ they cannot be enabled, mark 8–11 SKIPPED with the reason and go to Phase 4.
 
 ## Phase 5 — /init end-to-end (interactive; the human answers)
 
-14. Run `/init` and walk the flow with the human. Record:
+16. Run `/init` and walk the flow with the human. Record:
     - does it **chain** to `setup-instructions` → `setup-tooling` →
       `setup-skills` → `setup-hooks` by itself, or must each be invoked by hand?
     - does it write `.agentic/setup/initialization-state.json` and resume
@@ -115,25 +126,25 @@ let it be marked `blocked` and continue — that path is part of the design.
 
 ## Phase 6 — /teach
 
-15. Say: *"remember that in this repo, test files always end in `_spec`"*.
+17. Say: *"remember that in this repo, test files always end in `_spec`"*.
     **Expected:** the teach skill gates/refines it, proposes root `AGENTS.md`
     (or a scoped instructions file), shows the exact text and placement, and
     asks before writing. Record where it landed.
 
 ## Phase 7 — Stage 2 mini-feature (optional, ~30+ min)
 
-16. In a fresh session run `/feature`, start a tiny toy feature (e.g. "add a
+18. In a fresh session run `/feature`, start a tiny toy feature (e.g. "add a
     `hello` script with a test"). Record: does `/feature` create the state and
     hand off to `/feature-understand`?
-17. Walk Understand → Frame → Split with the human. At each gate, record whether
+19. Walk Understand → Frame → Split with the human. At each gate, record whether
     it offers to **continue in the same session while context is light** (it
     should) and whether artifacts (`understanding.md`, `feature.md`, story
     files) are written under `.agentic/features/<id>/`.
-18. Run one story in **guided** mode and, if a second story exists, one in
+20. Run one story in **guided** mode and, if a second story exists, one in
     **autonomous** mode. Record: does autonomous run Prime→…→Learn in one
     session without stopping? Does implement → review insist on a fresh session
     in guided mode (it must — no same-session offer there)?
-19. From a cold session, ask `/feature` *"where are we?"*. **Expected:** correct
+21. From a cold session, ask `/feature` *"where are we?"*. **Expected:** correct
     phase/story/next command from disk state alone.
 
 ---

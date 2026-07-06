@@ -26,6 +26,10 @@ derive `feature-id`, create `.agentic/features/<feature-id>/`, and register it i
 
 - **Always:** the codebase + Graphifyy graph (affected/related areas), `AGENTS.md`,
   any links/files the user gives, and online sources you can fetch.
+- **Declared dependency repos** (`AGENTS.md` → Workspace & Dependencies): use
+  their Graphifyy graphs for a high-level map; open a read-only dep's code only
+  when a specific behavior matters. Findings in read-only deps are **fixed
+  constraints** — you adapt to them, you don't change them — record them as such.
 - **Jira/wiki (optional, credential-gated):** if `JIRA_TOKEN`/`JIRA_BASE_URL` or
   `WIKI_TOKEN`/`WIKI_BASE_URL` are set in the environment, pull the ticket/pages
   directly. Otherwise ask the user to paste the content or give a fetchable link,
@@ -35,7 +39,9 @@ derive `feature-id`, create `.agentic/features/<feature-id>/`, and register it i
 ## Hunt for gaps (don't just summarize)
 
 - synthesize all sources into one problem statement + current-behavior description;
-- map affected areas/modules via Graphifyy + `AGENTS.md`;
+- map affected areas/modules via Graphifyy + `AGENTS.md` — across this repo and
+  the declared dependency repos, marking each dependency area editable or
+  read-only;
 - surface unstated assumptions, ambiguities, and **edge cases the ticket omitted**;
 - list unknowns and ask the user targeted questions to close them.
 

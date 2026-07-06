@@ -1,3 +1,3 @@
 """AKMaestro — conduct your agentic coding with GitHub Copilot."""
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"

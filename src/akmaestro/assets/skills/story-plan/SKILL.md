@@ -30,7 +30,9 @@ same session. If there's no approved primer (guided), send back to `/story-prime
 
 Planning checklist: within story scope; satisfies the story AC; reuses existing
 patterns in the touched area; tests cover happy + edge cases; no restricted areas;
-no unplanned scope creep.
+no unplanned scope creep; **cross-repo** — no read-only dependency is touched,
+and changes in an editable dependency come first (contract + its own tests, per
+that repo's `AGENTS.md`), then the consuming change here.
 
 ## Output: append a Plan to the story file
 

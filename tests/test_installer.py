@@ -233,6 +233,9 @@ HOOK_CASES = [
     ("restricted-path-guard.sh", '{"toolName":"edit","toolArgs":{"path":"README.md"}}', "allow"),
     ("restricted-path-guard.sh", '{"tool_name":"create","tool_input":{"path":"secrets/x.txt"}}', "deny"),
     ("restricted-path-guard.sh", "garbage not json", "allow"),
+    # Workspace boundary: outside the repo and not a declared editable dep.
+    ("restricted-path-guard.sh", '{"toolName":"edit","toolArgs":{"path":"../vendor-c/core.py"}}', "deny"),
+    ("restricted-path-guard.sh", '{"toolName":"edit","toolArgs":{"path":"/etc/hosts"}}', "deny"),
     ("dangerous-command-guard.sh", '{"toolName":"bash","toolArgs":{"command":"rm -rf /"}}', "deny"),
     ("dangerous-command-guard.sh", '{"toolName":"bash","toolArgs":{"command":"ls -la"}}', "allow"),
     ("dangerous-command-guard.sh",
@@ -255,6 +258,77 @@ def test_bash_guard_logic(tmp_path, script, payload, expected):
     assert proc.returncode == 0, proc.stderr  # guards must always exit 0
     decision = json.loads(proc.stdout)
     assert decision["permissionDecision"] == expected
+
+
+@pytest.mark.parametrize("script,payload,expected", HOOK_CASES)
+def test_powershell_guard_logic(tmp_path, script, payload, expected):
+    if not _have("pwsh"):
+        pytest.skip("pwsh required")
+    installer.init(str(tmp_path))
+
+    proc = _run_pwsh(script.replace(".sh", ".ps1"), payload, tmp_path)
+
+    assert proc.returncode == 0, proc.stderr
+    assert json.loads(proc.stdout)["permissionDecision"] == expected
+
+
+EDITABLE_CASES = [
+    # A declared editable satellite is writable from the main repo's session…
+    ('{"toolName":"edit","toolArgs":{"path":"../lib-b/src/mod.py"}}', "allow"),
+    # …including via a sneaky in-repo-looking traversal…
+    ('{"toolName":"edit","toolArgs":{"path":"src/../../lib-b/ok.py"}}', "allow"),
+    # …but restricted globs still apply inside it…
+    ('{"toolName":"edit","toolArgs":{"path":"../lib-b/.env"}}', "deny"),
+    # …and undeclared siblings stay read-only.
+    ('{"toolName":"edit","toolArgs":{"path":"../vendor-c/core.py"}}', "deny"),
+]
+
+
+def _satellite_repo(tmp_path):
+    repo = tmp_path / "repo-a"
+    repo.mkdir()
+    (tmp_path / "lib-b").mkdir()
+    (tmp_path / "vendor-c").mkdir()
+    installer.init(str(repo))
+    with (repo / ".agentic" / "hooks" / "editable-paths.txt").open("a") as fh:
+        fh.write("../lib-b\n")
+    return repo
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="bash guards are POSIX-only")
+@pytest.mark.parametrize("payload,expected", EDITABLE_CASES)
+def test_workspace_boundary_with_editable_satellite(tmp_path, payload, expected):
+    if not _have("bash") or not _have("jq"):
+        pytest.skip("bash and jq required")
+    repo = _satellite_repo(tmp_path)
+
+    proc = subprocess.run(
+        ["bash", ".github/hooks/scripts/restricted-path-guard.sh"],
+        input=payload, capture_output=True, text=True, cwd=repo,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    assert json.loads(proc.stdout)["permissionDecision"] == expected
+
+
+@pytest.mark.parametrize("payload,expected", EDITABLE_CASES)
+def test_workspace_boundary_powershell(tmp_path, payload, expected):
+    if not _have("pwsh"):
+        pytest.skip("pwsh required")
+    repo = _satellite_repo(tmp_path)
+
+    proc = _run_pwsh("restricted-path-guard.ps1", payload, repo)
+
+    assert proc.returncode == 0, proc.stderr
+    assert json.loads(proc.stdout)["permissionDecision"] == expected
+
+
+def _run_pwsh(script, payload, cwd):
+    return subprocess.run(
+        ["pwsh", "-NoProfile", "-ExecutionPolicy", "Bypass",
+         "-File", str(Path(".github/hooks/scripts") / script)],
+        input=payload, capture_output=True, text=True, cwd=cwd,
+    )
 
 
 def _have(tool):

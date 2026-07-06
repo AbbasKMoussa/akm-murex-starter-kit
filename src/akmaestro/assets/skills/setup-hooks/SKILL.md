@@ -32,7 +32,10 @@ seed data in `.agentic/hooks/`. This step:
 
 - confirms the files are present and the `.sh` scripts are executable;
 - **seeds repo-specific data**: add the restricted areas from `AGENTS.md` to
-  `.agentic/hooks/restricted-paths.txt`; add detected lint commands (per
+  `.agentic/hooks/restricted-paths.txt`; add each **editable** dependency from
+  the Workspace & Dependencies section to `.agentic/hooks/editable-paths.txt`
+  (the boundary rule: edits outside the repo are denied unless under a listed
+  path — read-only deps are never listed); add detected lint commands (per
   extension, `{file}` placeholder) to `.agentic/hooks/lint-commands.json`;
 - never overwrites an existing hook config or a script the user customized —
   merge handler arrays per event; show changes and confirm.
@@ -50,6 +53,8 @@ a positive match. Do not "harden" them into failing closed on error.
 - Dry-run the bash guards — both paths:
   - `printf '{"toolName":"edit","toolArgs":{"path":".env"}}' | bash .github/hooks/scripts/restricted-path-guard.sh` → deny
   - same with `"path":"README.md"` → allow
+  - same with `"path":"../not-a-declared-dep/x.txt"` → deny (workspace boundary)
+  - if an editable dep is declared, same with a path under it → allow
   - `printf '{"toolName":"bash","toolArgs":{"command":"rm -rf /"}}' | bash .github/hooks/scripts/dangerous-command-guard.sh` → deny
   - same with `"command":"ls -la"` → allow
 

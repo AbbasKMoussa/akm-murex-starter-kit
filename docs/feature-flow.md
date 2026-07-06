@@ -83,6 +83,25 @@ instructions/tooling/skills are not ready, it points the user there before
 starting. The feature flow relies on the agent files, LSP, and Graphifyy that
 Stage 1 installs.
 
+## Multi-repo workspaces
+
+The main repo is always the **flow home**: state, artifacts, and every session
+live here, even when work spans repos. Dependencies checked out locally are
+declared in `AGENTS.md` (Workspace & Dependencies) with one of two roles:
+
+- **Editable satellite** — a repo the team owns; functionally part of the
+  application, just in its own git repo. Stories may change it as part of normal
+  work here: the Split phase tags each story with the repos it touches, the
+  dependency-side contract (interface + its tests, per that repo's own
+  `AGENTS.md`) is delivered before the consuming side, and satellite changes are
+  committed in the satellite referencing the feature id. The restricted-path
+  guard permits these paths via `.agentic/hooks/editable-paths.txt`.
+- **Read-only reference** — another team's code, consulted to understand
+  behavior: its Graphifyy graph for the high-level map, its code only when a
+  specific behavior matters. Findings there are fixed constraints. It is never
+  edited (the boundary guard denies it); a change needed there is recorded in
+  `feature.md` as an external dependency for the owning team, never a story.
+
 ## Phases and skills
 
 The feature flow ships as an orchestrator plus per-step skills (so each step can

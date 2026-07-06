@@ -123,6 +123,20 @@ How it behaves:
 - **It improves the repo as it goes** — the Learn/Retro steps feed lessons back
   into your instructions via `/teach`.
 
+### Multi-repo workspaces
+
+If your app spans repos, declare local dependency checkouts during `/init`
+(they land in `AGENTS.md` → Workspace & Dependencies), each with a role:
+
+- **Editable** — a sibling repo your team owns (e.g. `../lib-b`): functionally
+  part of the application, so stories can change it as part of normal work here.
+  It's whitelisted in `.agentic/hooks/editable-paths.txt`, and its own
+  build/test commands are honored.
+- **Read-only reference** — another team's code (e.g. `../vendor-c`): indexed by
+  Graphifyy/LSP so the agent understands it, read when needed, but **never
+  edited** — the restricted-path guard denies any edit outside the repo and its
+  declared editable dependencies.
+
 ### Optional: pull from Jira / wiki
 
 The Understand phase can read a ticket/page directly if you provide credentials

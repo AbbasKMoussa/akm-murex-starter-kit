@@ -65,6 +65,9 @@ fix when not `ok`.
 
 - `graphify --version` works; `graphify-out/graph.json` exists. Missing →
   **fail**/**warn** with the install/extract commands from the tooling topic.
+- Each dependency repo declared in `AGENTS.md` (Workspace & Dependencies) has
+  its own `graphify-out/graph.json` and exists on disk. Missing → **warn** with
+  the `cd <dep> && graphify extract .` command.
 - Each LSP listed in `.agentic/setup/tooling-state.json` responds to its version
   command.
 
@@ -84,12 +87,20 @@ fix when not `ok`.
   `hooks` object with known event names. Parse error → **fail**.
 - Every script referenced by the config exists; `.sh` files are executable.
   Non-executable → **warn** (fixable).
-- `.agentic/hooks/restricted-paths.txt`, `dangerous-commands.txt`, and
-  `lint-commands.json` exist. Missing → **warn** (fixable).
+- `.agentic/hooks/restricted-paths.txt`, `dangerous-commands.txt`,
+  `editable-paths.txt`, and `lint-commands.json` exist. Missing → **warn**
+  (fixable).
+- Cross-check `editable-paths.txt` against the Workspace & Dependencies section
+  of `AGENTS.md`: an editable dep missing from the file → **warn** (its edits
+  will be denied); a read-only dep listed in the file → **fail** (the boundary
+  is not protecting it). Each listed path should exist on disk → **warn** if not.
 - `.agentic/audit/` is gitignored. Not ignored → **warn** (fixable).
 - **Dry-run the bash guards (logic check):**
   - restricted-path deny: `printf '{"toolName":"edit","toolArgs":{"path":".env"}}' | bash .github/hooks/scripts/restricted-path-guard.sh` → expect `deny`.
   - restricted-path allow: same with `"path":"README.md"` → expect `allow`.
+  - workspace boundary: same with `"path":"../akm-doctor-probe/x.txt"` (a
+    nonexistent sibling) → expect `deny`; if an editable dep is declared, a path
+    under it → expect `allow`.
   - dangerous-command deny: `printf '{"toolName":"bash","toolArgs":{"command":"rm -rf /"}}' | bash .github/hooks/scripts/dangerous-command-guard.sh` → expect `deny`.
   - dangerous-command allow: same with `"command":"ls -la"` → expect `allow`.
 

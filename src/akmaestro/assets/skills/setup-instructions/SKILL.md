@@ -21,7 +21,12 @@ a short interview. `AGENTS.md` is the source of truth;
 
 1. Product: what it is and does. 2. Test command. 3. Build command. 4. Run/serve
 command (if any). 5. How to verify a change. 6. CI notes. 7. Complex modules.
-8. Related repositories (and when to consider each). 9. Branch naming.
+8. **Workspace & dependencies:** does this repo depend on other locally
+checked-out repos? For each: where it is checked out (e.g. `../lib-b`), its
+role — **editable** (we own it; functionally part of this application, just in
+its own git repo) or **read-only reference** (another team's code we consult
+but never modify) — and, for editable ones, how a change there reaches this
+repo (relative link, version bump + publish, rebuild). 9. Branch naming.
 10. Commit style. 11. Restricted files/areas (no edit without approval).
 
 Keep it short; only follow up where an answer is incomplete or has setup
@@ -32,7 +37,16 @@ consequences.
 Create/merge:
 
 - `AGENTS.md` with sections: Product, Repository Context, Stack, Build, Tests,
-  **Run**, **Verify a Change**, CI, Complex Modules, Git Workflow, Agent Rules.
+  **Run**, **Verify a Change**, CI, Complex Modules, **Workspace & Dependencies**,
+  Git Workflow, Agent Rules.
+- **Workspace & Dependencies** lists each declared dependency repo with its
+  checkout path, role, and rules: *editable* deps may be changed as part of
+  normal work here (follow their own `AGENTS.md`; state how changes flow back);
+  *read-only* deps are consulted for understanding only — a needed change there
+  is an external dependency to surface, never an edit. For each editable dep,
+  also append its path to `.agentic/hooks/editable-paths.txt` (the boundary
+  guard reads it) and recommend running `akmaestro init` inside that repo so it
+  has its own `AGENTS.md`.
 - `.github/copilot-instructions.md` — short; points to `AGENTS.md`,
   `.github/instructions/`, nested `AGENTS.md`. Never duplicate the full
   instructions there.

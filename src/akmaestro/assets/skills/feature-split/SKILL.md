@@ -36,6 +36,11 @@ First ask: **do you already have a split in mind?**
   value. Bias to **fewer, larger** stories; split only when one is genuinely too
   big for a single Phase 3 loop. Story-level, never a task list.
 - **Order** them; make **dependencies explicit**.
+- **Tag repos.** Mark which repos each story touches: this repo, an editable
+  dependency, or both. A story spanning an editable dependency delivers the
+  dependency-side contract (interface + its tests) before the consuming side. A
+  change needed in a **read-only** dependency can never be a story — record it
+  in `feature.md` as an external dependency/blocker for the owning team.
 - **Trace coverage:** every acceptance criterion in `feature.md` maps to ≥1 story;
   flag any uncovered AC and any story not tracing back to the feature.
 - Each story gets its own testable, behavior-focused acceptance criteria.
@@ -57,6 +62,9 @@ One file per story + update `feature.md`'s Stories section.
 
 ## Dependencies
 - <other story, or "none">
+
+## Repos
+- <this repo, and/or `../<editable-dep>` — which repos this story changes>
 
 ## Status
 not-started   # not-started → primed → planned → implemented → reviewed → done

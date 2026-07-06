@@ -33,6 +33,10 @@ Gather and persist (via Graphifyy + LSP + reading code):
 
 - relevant files/symbols and how the area works today;
 - constraints and conventions in the touched area (from `AGENTS.md`);
+- for a story touching an **editable dependency** (see the story's Repos tag):
+  that repo's own `AGENTS.md` (its build/test commands) and the touched area
+  there; for **read-only deps**: the exact behavior being depended on — a fixed
+  constraint to record, never something to change;
 - what to change and what *not* to touch;
 - the test approach (how this slice will be tested).
 
@@ -43,11 +47,11 @@ the area; the story's acceptance criteria; edge cases from `understanding.md`.
 
 ```md
 ## Primer
-- Relevant files: `<path>` — <why>
+- Relevant files: `<path>` — <why>   (may span declared dependency repos)
 - How it works today: <short>
-- Touch / don't touch: <scope>
-- Test approach: <how this slice is verified>
-- Notes/constraints: <…>
+- Touch / don't touch: <scope; read-only deps are always "don't touch">
+- Test approach: <how this slice is verified — per repo if cross-repo>
+- Notes/constraints: <… incl. behaviors pinned by read-only deps>
 ```
 
 Set the story `status: primed`.

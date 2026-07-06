@@ -59,6 +59,16 @@ Build the repo graph from the repository root:
 graphify extract .
 ```
 
+If `AGENTS.md` declares workspace dependencies (editable or read-only), build a
+graph for each of them too — high-level understanding of a read-only dependency
+is exactly what its graph provides, so the agent only opens its code when a
+specific behavior matters:
+
+```bash
+(cd ../lib-b && graphify extract .)
+(cd ../vendor-c && graphify extract .)
+```
+
 Expected output:
 
 ```text

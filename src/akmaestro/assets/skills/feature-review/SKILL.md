@@ -29,6 +29,12 @@ files. If any story isn't `done`, point back to the per-story loop.
   handled end-to-end.
 - **Tests & build** — run the feature's tests and the build; green? Record
   `blocked` + reason if the environment can't.
+- **Cross-repo integration** — if stories touched an editable dependency: its own
+  tests/build pass, its changes are committed there (referencing the feature id),
+  and this repo consumes them through the declared mechanism (link/version/
+  rebuild) — not through uncommitted local state. No read-only dependency was
+  modified; any external dependencies recorded in `feature.md` are resolved or
+  explicitly still open.
 - **Conventions & safety** — consistent with `AGENTS.md`; no scope creep beyond the
   feature; no restricted-area changes.
 

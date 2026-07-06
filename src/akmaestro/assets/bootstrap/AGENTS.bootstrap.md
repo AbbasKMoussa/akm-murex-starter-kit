@@ -25,6 +25,13 @@
 
 <how a developer confirms a change works>
 
+## Workspace & Dependencies
+
+<run `/init` to fill in: locally checked-out dependency repos, each marked
+**editable** (we own it — may be changed as part of work here, following its own
+AGENTS.md) or **read-only reference** (consult only; never edit; a needed change
+there is an external dependency to surface)>
+
 ## Agent Rules
 
 - Keep changes scoped to the requested task.
