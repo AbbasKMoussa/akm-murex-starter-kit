@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # dangerous-command-guard.sh — preToolUse guard
 #
-# STATUS: DRAFT, NOT YET FIRED AGAINST A LIVE COPILOT CLI.
-# Verify the shell tool names (bash/powershell) and the command field on the GA
-# CLI, then exercise both allow and deny paths before trusting this.
+# PAYLOAD SHAPE (captured from GA Copilot CLI 1.0.68, 2026-07-06): toolArgs is a
+# JSON-ENCODED STRING (e.g. "{\"command\":\"...\"}"), not a nested object, so we
+# parse it a second time (fromjson) before reading `command`. Object-form is
+# still accepted. STATUS: the PowerShell twin is live-verified on the Windows
+# CLI; this bash variant is fixed by analogy and confirmed against the captured
+# payload + CI, pending a live bash-surface re-confirmation.
 #
 # Denies shell commands matching a pattern in
 # .agentic/hooks/dangerous-commands.txt.
@@ -22,7 +25,11 @@ command -v jq >/dev/null 2>&1 || allow
 payload="$(cat 2>/dev/null)" || allow
 [ -n "$payload" ] || allow
 
-cmd="$(printf '%s' "$payload" | jq -r '((.toolArgs // .tool_input) // {}).command // empty' 2>/dev/null)" || allow
+cmd="$(printf '%s' "$payload" | jq -r '
+  (.toolArgs // .tool_input) as $a
+  | (if ($a | type) == "string" then ($a | fromjson? // {}) else ($a // {}) end) as $args
+  | ($args.command // empty)
+' 2>/dev/null)" || allow
 [ -n "$cmd" ] && [ "$cmd" != "null" ] || allow
 
 patterns_file=".agentic/hooks/dangerous-commands.txt"

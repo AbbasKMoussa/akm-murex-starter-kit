@@ -1,6 +1,10 @@
 # restricted-path-guard.ps1 — preToolUse guard (PowerShell variant)
 #
-# STATUS: DRAFT, NOT YET FIRED AGAINST A LIVE COPILOT CLI. See the .sh variant.
+# LIVE-VERIFIED against GA Copilot CLI 1.0.68 on Windows (2026-07-06). The event
+# is { toolName, toolArgs, cwd, ... } where toolArgs is a JSON-ENCODED STRING
+# (e.g. "{\"path\":\"D:\\...\\.env\",...}"), not a nested object, and `path` is
+# ABSOLUTE. We decode toolArgs a second time and match on the repo-relative
+# path. Object-form toolArgs is still accepted (VS Code / dry-runs).
 #
 # Two rules, in order:
 #   1. Workspace boundary — edits resolving OUTSIDE the repository root are
@@ -62,6 +66,11 @@ try {
   $o = $raw | ConvertFrom-Json
   $a = if ($o.toolArgs) { $o.toolArgs } elseif ($o.tool_input) { $o.tool_input } else { $null }
   if ($null -eq $a) { Allow }
+  # The GA CLI sends toolArgs as a JSON-encoded string — decode it. (Object-form
+  # from other surfaces / dry-runs is used as-is.)
+  if ($a -is [string]) {
+    try { $a = $a | ConvertFrom-Json } catch { Allow }
+  }
 
   $path = $a.path
   if (-not $path) { $path = $a.file_path }

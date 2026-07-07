@@ -16,10 +16,19 @@ ts="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)"
 payload="$(cat 2>/dev/null)" || exit 0
 
 if command -v jq >/dev/null 2>&1; then
+  # The GA CLI sends no explicit event-name field (captured 2026-07-06), so
+  # infer the event kind structurally: a tool call has toolName (+ toolResult
+  # once it has run), a prompt event has `prompt`, a session-end has `reason`.
   printf '%s' "$payload" | jq -c --arg ts "$ts" '
     {
       received_at: $ts,
-      event:   (.hook_event_name // .hookEventName // null),
+      event: (
+        .hook_event_name // .hookEventName //
+        (if      has("toolName") then (if has("toolResult") then "postToolUse" else "preToolUse" end)
+         elif    has("prompt")   then "userPromptSubmitted"
+         elif    has("reason")   then "sessionEnd"
+         else    "unknown" end)
+      ),
       session: (.sessionId // .session_id // null),
       tool:    (.toolName // .tool_name // null),
       raw: .

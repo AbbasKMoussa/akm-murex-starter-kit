@@ -95,18 +95,21 @@ fix when not `ok`.
   will be denied); a read-only dep listed in the file → **fail** (the boundary
   is not protecting it). Each listed path should exist on disk → **warn** if not.
 - `.agentic/audit/` is gitignored. Not ignored → **warn** (fixable).
-- **Dry-run the bash guards (logic check):**
-  - restricted-path deny: `printf '{"toolName":"edit","toolArgs":{"path":".env"}}' | bash .github/hooks/scripts/restricted-path-guard.sh` → expect `deny`.
-  - restricted-path allow: same with `"path":"README.md"` → expect `allow`.
-  - workspace boundary: same with `"path":"../akm-doctor-probe/x.txt"` (a
-    nonexistent sibling) → expect `deny`; if an editable dep is declared, a path
-    under it → expect `allow`.
-  - dangerous-command deny: `printf '{"toolName":"bash","toolArgs":{"command":"rm -rf /"}}' | bash .github/hooks/scripts/dangerous-command-guard.sh` → expect `deny`.
-  - dangerous-command allow: same with `"command":"ls -la"` → expect `allow`.
+- **Dry-run the guards with the REAL CLI payload shape.** The GA Copilot CLI
+  sends `toolArgs` as a **JSON-encoded string**, not a nested object (verified
+  2026-07-06). Dry-run with that shape — an object-form probe passes even when
+  the guards are dead (this is exactly how a broken build once looked healthy).
+  On Windows/pwsh, pipe the same JSON to `pwsh -File …guard.ps1` instead.
+  - restricted-path deny: `printf '%s' '{"toolName":"edit","toolArgs":"{\"path\":\".env\"}"}' | bash .github/hooks/scripts/restricted-path-guard.sh` → expect `deny`.
+  - restricted-path allow: same with the inner `"path":"README.md"` → expect `allow`.
+  - workspace boundary: inner `"path":"../akm-doctor-probe/x.txt"` (a nonexistent
+    sibling) → expect `deny`; if an editable dep is declared, a path under it → `allow`.
+  - dangerous-command deny: `printf '%s' '{"toolName":"powershell","toolArgs":"{\"command\":\"rm -rf /\"}"}' | bash .github/hooks/scripts/dangerous-command-guard.sh` → expect `deny`.
+  - dangerous-command allow: same with inner `"command":"ls -la"` → expect `allow`.
 
-  Wrong result → **fail**. State clearly that this validates script *logic* only;
-  the live Copilot CLI wiring (real tool names / `toolArgs` fields, PowerShell
-  variants) must still be verified in an actual session.
+  Wrong result → **fail**. This validates script *logic* against the real
+  payload shape; the definitive live-session wiring is still best confirmed in an
+  actual Copilot session (see `copilot-manual-test/`).
 
 ### 6. Setup state drift
 

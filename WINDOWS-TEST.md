@@ -64,28 +64,34 @@ run regardless of policy.
 
 ### restricted-path-guard.ps1
 
+> **Real payload shape (verified 2026-07-06):** the GA Copilot CLI sends
+> `toolArgs` as a **JSON-encoded string**, not a nested object. The tests below
+> use that string form (`"toolArgs":"{\"path\":\"…\"}"`). Object-form is still
+> accepted for back-compat, but string is what the live CLI actually sends —
+> testing the object form is what previously hid a fail-open bug.
+
 ```powershell
 $g = ".github\hooks\scripts\restricted-path-guard.ps1"
-'{"toolName":"edit","toolArgs":{"path":".env"}}'              | pwsh -ExecutionPolicy Bypass -File $g   # B1
-'{"toolName":"edit","toolArgs":{"path":"README.md"}}'         | pwsh -ExecutionPolicy Bypass -File $g   # B2
-'{"tool_name":"create","tool_input":{"path":"secrets/x.txt"}}'| pwsh -ExecutionPolicy Bypass -File $g   # B3
-'{"toolName":"edit","toolArgs":{"path":"src/app.py"}}'        | pwsh -ExecutionPolicy Bypass -File $g   # B4
-'garbage not json'                                            | pwsh -ExecutionPolicy Bypass -File $g   # B5
+'{"toolName":"edit","toolArgs":"{\"path\":\".env\"}"}'               | pwsh -ExecutionPolicy Bypass -File $g   # B1
+'{"toolName":"edit","toolArgs":"{\"path\":\"README.md\"}"}'          | pwsh -ExecutionPolicy Bypass -File $g   # B2
+'{"tool_name":"create","tool_input":"{\"path\":\"secrets/x.txt\"}"}' | pwsh -ExecutionPolicy Bypass -File $g   # B3
+'{"toolName":"edit","toolArgs":"{\"path\":\"src/app.py\"}"}'         | pwsh -ExecutionPolicy Bypass -File $g   # B4
+'garbage not json'                                                   | pwsh -ExecutionPolicy Bypass -File $g   # B5
 ```
 
 **Expected:** B1 **deny** · B2 **allow** · B3 **deny** (snake_case payload +
 directory match on `secrets/**`) · B4 **allow** · B5 **allow** (fail-open on
-unparseable input). B3 passing proves it reads both camelCase and snake_case
-payloads.
+unparseable input). B1 passing proves the string-encoded `toolArgs` is decoded;
+B3 proves it reads both camelCase and snake_case payloads.
 
 ### dangerous-command-guard.ps1
 
 ```powershell
 $g = ".github\hooks\scripts\dangerous-command-guard.ps1"
-'{"toolName":"bash","toolArgs":{"command":"rm -rf /"}}'                  | pwsh -ExecutionPolicy Bypass -File $g  # B6
-'{"toolName":"bash","toolArgs":{"command":"ls -la"}}'                    | pwsh -ExecutionPolicy Bypass -File $g  # B7
-'{"toolName":"bash","toolArgs":{"command":"git push --force origin main"}}' | pwsh -ExecutionPolicy Bypass -File $g  # B8
-'{"toolName":"edit","toolArgs":{"path":"a.md","content":"rm -rf /"}}'    | pwsh -ExecutionPolicy Bypass -File $g  # B9
+'{"toolName":"powershell","toolArgs":"{\"command\":\"rm -rf /\"}"}'                  | pwsh -ExecutionPolicy Bypass -File $g  # B6
+'{"toolName":"powershell","toolArgs":"{\"command\":\"ls -la\"}"}'                    | pwsh -ExecutionPolicy Bypass -File $g  # B7
+'{"toolName":"powershell","toolArgs":"{\"command\":\"git push --force origin main\"}"}' | pwsh -ExecutionPolicy Bypass -File $g  # B8
+'{"toolName":"edit","toolArgs":"{\"path\":\"a.md\",\"file_text\":\"rm -rf /\"}"}'    | pwsh -ExecutionPolicy Bypass -File $g  # B9
 ```
 
 **Expected:** B6 **deny** · B7 **allow** · B8 **deny** · B9 **allow**. B9 is the
@@ -97,19 +103,21 @@ guard is wrongly scanning the whole payload — report it.)
 
 ```powershell
 $a = ".github\hooks\scripts\audit-log.ps1"
-'{"hook_event_name":"userPromptSubmitted","session_id":"abc","prompt":"hi"}' | pwsh -ExecutionPolicy Bypass -File $a  # B10
+'{"sessionId":"abc","timestamp":1,"cwd":"C:\\x","prompt":"hi"}' | pwsh -ExecutionPolicy Bypass -File $a  # B10
 Get-ChildItem .agentic\audit\*.jsonl | ForEach-Object { Get-Content $_ -Tail 1 }
 ```
 
 **Expected:** B10 prints nothing (observational hook) and exits 0; a
 `.agentic\audit\<date>.jsonl` file now exists with one JSON line containing
-`"event":"userPromptSubmitted"` and `"session":"abc"`.
+`"event":"userPromptSubmitted"` and `"session":"abc"`. This uses the **real**
+CLI shape (no `hook_event_name` field), so it verifies the event kind is
+inferred structurally from the presence of `prompt`.
 
 ### lint-on-edit.ps1
 
 ```powershell
 $l = ".github\hooks\scripts\lint-on-edit.ps1"
-'{"toolName":"edit","toolArgs":{"path":"AGENTS.md"}}' | pwsh -ExecutionPolicy Bypass -File $l  # B11
+'{"toolName":"edit","toolArgs":"{\"path\":\"AGENTS.md\"}"}' | pwsh -ExecutionPolicy Bypass -File $l  # B11
 ```
 
 **Expected:** B11 prints nothing and exits 0 — no lint command is configured for

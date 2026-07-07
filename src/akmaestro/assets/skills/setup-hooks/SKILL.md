@@ -50,17 +50,18 @@ a positive match. Do not "harden" them into failing closed on error.
 
 - `jq . .github/hooks/hooks.json` parses; events/handlers are valid.
 - Scripts exist and `.sh` are executable; `jq` present (bash guards need it).
-- Dry-run the bash guards — both paths:
-  - `printf '{"toolName":"edit","toolArgs":{"path":".env"}}' | bash .github/hooks/scripts/restricted-path-guard.sh` → deny
-  - same with `"path":"README.md"` → allow
-  - same with `"path":"../not-a-declared-dep/x.txt"` → deny (workspace boundary)
-  - if an editable dep is declared, same with a path under it → allow
-  - `printf '{"toolName":"bash","toolArgs":{"command":"rm -rf /"}}' | bash .github/hooks/scripts/dangerous-command-guard.sh` → deny
-  - same with `"command":"ls -la"` → allow
+- Dry-run the guards with the **real CLI payload shape** — `toolArgs` is a
+  JSON-encoded *string*, not a nested object (an object-form probe passes even
+  against dead guards). On Windows, pipe the same JSON to the `.ps1` via `pwsh`.
+  - `printf '%s' '{"toolName":"edit","toolArgs":"{\"path\":\".env\"}"}' | bash .github/hooks/scripts/restricted-path-guard.sh` → deny
+  - same with inner `"path":"README.md"` → allow
+  - same with inner `"path":"../not-a-declared-dep/x.txt"` → deny (workspace boundary)
+  - if an editable dep is declared, inner path under it → allow
+  - `printf '%s' '{"toolName":"powershell","toolArgs":"{\"command\":\"rm -rf /\"}"}' | bash .github/hooks/scripts/dangerous-command-guard.sh` → deny
+  - same with inner `"command":"ls -la"` → allow
 
-This validates script logic only; the live Copilot CLI wiring (real tool
-names/`toolArgs` fields) and the PowerShell variants must be confirmed in an
-actual session.
+This validates script logic against the real payload shape. The definitive
+live-session confirmation still belongs in an actual Copilot session.
 
 ## New session
 

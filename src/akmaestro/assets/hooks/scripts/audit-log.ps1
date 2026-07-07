@@ -15,9 +15,20 @@ try {
   $line = $null
   try {
     $o = $raw | ConvertFrom-Json
+    # The GA CLI sends no explicit event-name field — infer it structurally:
+    # a tool call has toolName (+ toolResult once run); a prompt event has
+    # `prompt`; a session-end has `reason`.
+    $event = if ($o.hook_event_name) { $o.hook_event_name }
+      elseif ($o.hookEventName) { $o.hookEventName }
+      elseif ($o.PSObject.Properties.Name -contains 'toolName') {
+        if ($o.PSObject.Properties.Name -contains 'toolResult') { 'postToolUse' } else { 'preToolUse' }
+      }
+      elseif ($o.PSObject.Properties.Name -contains 'prompt') { 'userPromptSubmitted' }
+      elseif ($o.PSObject.Properties.Name -contains 'reason') { 'sessionEnd' }
+      else { 'unknown' }
     $rec = [ordered]@{
       received_at = $ts
-      event   = $(if ($o.hook_event_name) { $o.hook_event_name } else { $o.hookEventName })
+      event   = $event
       session = $(if ($o.sessionId) { $o.sessionId } else { $o.session_id })
       tool    = $(if ($o.toolName) { $o.toolName } else { $o.tool_name })
       raw     = $o

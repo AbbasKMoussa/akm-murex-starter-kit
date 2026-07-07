@@ -1,4 +1,4 @@
-# Testing AKMaestro (v0.3.0)
+# Testing AKMaestro (v0.4.1)
 
 > For a structured, agent-driven live verification session (recommended), see
 > [`copilot-manual-test/README.md`](copilot-manual-test/README.md) — it walks
@@ -74,9 +74,16 @@ you to open a new session and run the next command — that's expected. Try both
 
 - Anything confusing, broken, or that wrote a file you didn't expect.
 
-## Known gaps (no need to report)
+## Status (as of the 2026-07-06 live run on Copilot CLI 1.0.68, Windows)
 
-- Hook **PowerShell** variants and the **live Copilot CLI wiring** (real tool
-  names / `toolArgs` fields) are not yet verified.
-- Stage 2 skills are **unproven in a live session** — orchestrator→step handoff
-  and the autonomous internal loop are exactly what we're testing.
+- **Verified live:** skill discovery (incl. natural-language routing), `/doctor`,
+  the full `/init` chain with state persistence/resume, `/teach`, and the whole
+  Stage 2 `/feature` flow (guided + autonomous stories, cold-session recovery).
+- **Fixed after the run (v0.4.1):** the guard hooks were failing *open* — the GA
+  CLI sends `toolArgs` as a JSON-encoded string, not an object, so the guards read
+  a null path/command and allowed everything. All guards now decode it; the
+  PowerShell twins were confirmed live, the bash twins by-analogy + CI. A live
+  **re-confirmation** that the guards now deny (`copilot-manual-test/` Phase 3) is
+  the one open item.
+- Still unverified: the **bash** guards on a live macOS/Linux Copilot CLI, and
+  the **VS Code** surface (hooks are preview there and may be policy-disabled).

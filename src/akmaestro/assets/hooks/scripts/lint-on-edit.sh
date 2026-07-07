@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # lint-on-edit.sh — postToolUse hook
 #
-# STATUS: DRAFT, NOT YET FIRED AGAINST A LIVE COPILOT CLI.
+# STATUS: the PowerShell twin fired live on the GA CLI (Windows); this bash
+# variant is fixed by analogy (toolArgs decoded as a JSON string) and unverified
+# on a live bash surface.
 # Context-injection field VERIFIED: postToolUse output is
 #   { modifiedResult?: {...}, additionalContext?: string }
 # so {"additionalContext": "..."} below is correct. NOTE: copilot-cli#2980 — the
@@ -23,9 +25,11 @@ command -v jq >/dev/null 2>&1 || noop
 payload="$(cat 2>/dev/null)" || noop
 [ -n "$payload" ] || noop
 
+# toolArgs is a JSON-encoded string on the GA CLI; decode it before reading path.
 path="$(printf '%s' "$payload" | jq -r '
-  ((.toolArgs // .tool_input) // {}) as $a
-  | ($a.path // $a.file_path // $a.filePath // $a.filename // $a.file // empty)
+  (.toolArgs // .tool_input) as $a
+  | (if ($a | type) == "string" then ($a | fromjson? // {}) else ($a // {}) end) as $args
+  | ($args.path // $args.file_path // $args.filePath // $args.filename // $args.file // empty)
 ' 2>/dev/null)" || noop
 [ -n "$path" ] && [ "$path" != "null" ] || noop
 [ -f "$path" ] || noop

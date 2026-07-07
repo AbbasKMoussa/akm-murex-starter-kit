@@ -59,6 +59,12 @@ looks wrong, especially in the Hooks section.
 
 ## Phase 3 — Live hooks (the main event)
 
+> Re-verification note: a prior live run found the guards fail-open because the
+> GA CLI sends `toolArgs` as a JSON-encoded string (not an object); the guards
+> were fixed to decode it. This phase confirms the fix fires live. If a probe is
+> NOT blocked, capture the exact audit payload for that call — the shape may have
+> shifted again.
+
 First ask the human whether hooks are enabled on this surface (VS Code agent
 hooks are preview and may be disabled by org policy; the CLI has them GA). If
 they cannot be enabled, mark 8–13 SKIPPED with the reason and go to Phase 4.

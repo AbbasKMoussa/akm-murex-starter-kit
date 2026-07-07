@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "akmaestro"
-version = "0.4.0"
+version = "0.4.1"
 description = "AKMaestro — conduct your agentic coding: set up a repo for GitHub Copilot (VS Code + CLI) and drive features with a guided flow."
 readme = "README.md"
 requires-python = ">=3.9"

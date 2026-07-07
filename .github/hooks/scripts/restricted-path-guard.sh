@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 # restricted-path-guard.sh — preToolUse guard
 #
-# STATUS: DRAFT, NOT YET FIRED AGAINST A LIVE COPILOT CLI.
-# Verify the toolArgs path field name and the create/edit tool names on the GA
-# CLI, then exercise both the allow and deny paths before trusting this.
+# PAYLOAD SHAPE (captured from GA Copilot CLI 1.0.68, 2026-07-06): the event is
+#   { toolName, toolArgs, cwd, ... } where toolArgs is a JSON-ENCODED STRING,
+#   e.g. "{\"path\":\"/abs/path/.env\",...}", NOT a nested object, and `path`
+#   is ABSOLUTE. We therefore parse toolArgs a second time (fromjson) and match
+#   on the repo-relative path. Object-form toolArgs is still accepted (VS Code /
+#   dry-runs). STATUS: the PowerShell twin is live-verified on the Windows CLI;
+#   this bash variant is fixed by analogy and confirmed against the captured
+#   payload + CI, pending a live bash-surface (macOS/Linux CLI) re-confirmation.
 #
 # Two rules, in order:
 #   1. Workspace boundary — create/edit resolving OUTSIDE the repository root is
@@ -31,11 +36,13 @@ command -v jq >/dev/null 2>&1 || allow
 payload="$(cat 2>/dev/null)" || allow
 [ -n "$payload" ] || allow
 
-# Normalize both payload casings (toolArgs / tool_input) and check likely path
-# field names defensively. Parse the specific field — never grep the whole blob.
+# Normalize both payload casings (toolArgs / tool_input), decode toolArgs when it
+# is a JSON-encoded string (the real GA CLI shape), and check likely path field
+# names defensively. Parse the specific field — never grep the whole blob.
 path="$(printf '%s' "$payload" | jq -r '
-  ((.toolArgs // .tool_input) // {}) as $a
-  | ($a.path // $a.file_path // $a.filePath // $a.filename // $a.file // empty)
+  (.toolArgs // .tool_input) as $a
+  | (if ($a | type) == "string" then ($a | fromjson? // {}) else ($a // {}) end) as $args
+  | ($args.path // $args.file_path // $args.filePath // $args.filename // $args.file // empty)
 ' 2>/dev/null)" || allow
 [ -n "$path" ] && [ "$path" != "null" ] || allow
 

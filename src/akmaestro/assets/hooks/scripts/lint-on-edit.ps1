@@ -1,6 +1,9 @@
 # lint-on-edit.ps1 — postToolUse hook (PowerShell variant)
 #
-# STATUS: DRAFT, NOT YET FIRED AGAINST A LIVE COPILOT CLI.
+# STATUS: fired live on the GA Copilot CLI (Windows, 2026-07-06); the no-lint
+# no-op path was confirmed. toolArgs is a JSON-encoded string there (decoded
+# below); the actual lint-injection path is unverified live (no linter was
+# configured for the edited extension during the run).
 # Context-injection field VERIFIED: {"additionalContext": "..."} is correct.
 # NOTE: copilot-cli#2980 — additionalContext is not always forwarded into the
 # context window (and not for MCP tool calls).
@@ -21,6 +24,10 @@ try {
   $o = $raw | ConvertFrom-Json
   $a = if ($o.toolArgs) { $o.toolArgs } elseif ($o.tool_input) { $o.tool_input } else { $null }
   if ($null -eq $a) { NoOp }
+  # The GA CLI sends toolArgs as a JSON-encoded string — decode it.
+  if ($a -is [string]) {
+    try { $a = $a | ConvertFrom-Json } catch { NoOp }
+  }
 
   $path = $a.path
   if (-not $path) { $path = $a.file_path }

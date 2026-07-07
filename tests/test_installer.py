@@ -272,6 +272,61 @@ def test_powershell_guard_logic(tmp_path, script, payload, expected):
     assert json.loads(proc.stdout)["permissionDecision"] == expected
 
 
+def _live_event(tool_name, inner):
+    """Build an event the way the GA Copilot CLI 1.0.68 actually sends it:
+    toolArgs is a JSON-ENCODED STRING (not a nested object). Mirrors the bytes
+    captured in .agentic/audit during the 2026-07-06 live run."""
+    return json.dumps({
+        "sessionId": "x", "timestamp": 1, "cwd": "/r",
+        "toolName": tool_name, "toolArgs": json.dumps(inner),
+    })
+
+
+def _live_cases(repo):
+    """Real-shape payloads with string toolArgs and ABSOLUTE paths — the exact
+    class the object-form dry-runs failed to catch (guards fell through to allow
+    because .path resolved to null on a string). Regression lock for that bug."""
+    return [
+        ("restricted-path-guard.sh",
+         _live_event("create", {"path": str(repo / ".env"), "file_text": "FOO=bar"}), "deny"),
+        ("restricted-path-guard.sh",
+         _live_event("edit", {"path": str(repo / "README.md")}), "allow"),
+        ("restricted-path-guard.sh",
+         _live_event("edit", {"path": str(repo / "secrets" / "s.txt")}), "deny"),
+        # A prompt-shape event (no toolName/toolArgs at all) must fall through.
+        ("restricted-path-guard.sh",
+         json.dumps({"sessionId": "x", "timestamp": 1, "cwd": str(repo), "prompt": "hi"}), "allow"),
+        ("dangerous-command-guard.sh",
+         _live_event("powershell", {"command": "rm -rf /"}), "deny"),
+        ("dangerous-command-guard.sh",
+         _live_event("powershell", {"command": "ls -la"}), "allow"),
+    ]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="bash guards are POSIX-only")
+def test_bash_guards_real_cli_payload_shape(tmp_path):
+    if not _have("bash") or not _have("jq"):
+        pytest.skip("bash and jq required")
+    installer.init(str(tmp_path))
+    for script, payload, expected in _live_cases(tmp_path):
+        proc = subprocess.run(
+            ["bash", f".github/hooks/scripts/{script}"],
+            input=payload, capture_output=True, text=True, cwd=tmp_path,
+        )
+        assert proc.returncode == 0, proc.stderr
+        assert json.loads(proc.stdout)["permissionDecision"] == expected, (script, payload)
+
+
+def test_powershell_guards_real_cli_payload_shape(tmp_path):
+    if not _have("pwsh"):
+        pytest.skip("pwsh required")
+    installer.init(str(tmp_path))
+    for script, payload, expected in _live_cases(tmp_path):
+        proc = _run_pwsh(script.replace(".sh", ".ps1"), payload, tmp_path)
+        assert proc.returncode == 0, proc.stderr
+        assert json.loads(proc.stdout)["permissionDecision"] == expected, (script, payload)
+
+
 EDITABLE_CASES = [
     # A declared editable satellite is writable from the main repo's session…
     ('{"toolName":"edit","toolArgs":{"path":"../lib-b/src/mod.py"}}', "allow"),
@@ -321,6 +376,28 @@ def test_workspace_boundary_powershell(tmp_path, payload, expected):
 
     assert proc.returncode == 0, proc.stderr
     assert json.loads(proc.stdout)["permissionDecision"] == expected
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="audit-log.sh is POSIX-only")
+def test_audit_log_infers_event_kind_structurally(tmp_path):
+    """The GA CLI sends no event-name field; audit-log must infer it from which
+    fields are present (toolName+toolResult / prompt / reason)."""
+    if not _have("bash") or not _have("jq"):
+        pytest.skip("bash and jq required")
+    installer.init(str(tmp_path))
+    events = [
+        ('{"sessionId":"s","toolName":"create","toolArgs":"{}","toolResult":{"resultType":"ok"}}', "postToolUse"),
+        ('{"sessionId":"s","prompt":"hi"}', "userPromptSubmitted"),
+        ('{"sessionId":"s","reason":"complete"}', "sessionEnd"),
+    ]
+    for payload, _ in events:
+        subprocess.run(["bash", ".github/hooks/scripts/audit-log.sh"],
+                       input=payload, capture_output=True, text=True, cwd=tmp_path)
+
+    lines = list((tmp_path / ".agentic" / "audit").glob("*.jsonl"))
+    assert lines, "no audit trail written"
+    recorded = [json.loads(l)["event"] for l in lines[0].read_text().splitlines()]
+    assert recorded == [e for _, e in events]
 
 
 def _run_pwsh(script, payload, cwd):
