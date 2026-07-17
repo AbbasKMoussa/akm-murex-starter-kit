@@ -18,7 +18,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-      - run: python -m pip install -e . pytest
+      - run: python -m pip install -e . pytest jsonschema
       - run: pytest -q
 
   build:
@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - run: uv build --wheel
-      - name: Verify the wheel bundles all 18 skills and the hooks
+      - name: Verify the wheel bundles skills, hooks, and state runtime
         run: |
           python3 - <<'EOF'
           import glob, sys, zipfile
@@ -37,6 +37,10 @@ jobs:
           hooks = [n for n in names if "/assets/hooks/" in n]
           assert len(skills) == 18, f"expected 18 skills in wheel, got {len(skills)}: {sorted(skills)}"
           assert any(n.endswith("hooks.json") for n in hooks), "hooks.json missing from wheel"
+          assert any(n.endswith("akmaestro/state.py") for n in names), "state controller missing"
+          schemas = [n for n in names if "/assets/schemas/" in n and n.endswith(".json")]
+          assert len(schemas) == 6, f"expected 6 schemas, got {len(schemas)}"
+          assert any(n.endswith("/assets/runtime/STATE-PROTOCOL.md") for n in names), "state protocol missing"
           assert not any(n.endswith(".pyc") for n in names), "stray .pyc in wheel"
-          print(f"wheel OK: {len(skills)} skills, {len(hooks)} hook files")
+          print(f"wheel OK: {len(skills)} skills, {len(hooks)} hook files, {len(schemas)} schemas")
           EOF

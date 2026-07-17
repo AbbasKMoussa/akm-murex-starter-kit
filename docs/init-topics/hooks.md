@@ -60,11 +60,13 @@ Verified facts that shape the design:
 - **Tool names**: shell = `bash` (Unix) / `powershell` (Windows); file ops =
   `create`, `edit`, `view`. `matcher` is a regex compiled as `^(?:PATTERN)$` and
   matched against the tool name.
-- **Payload casing is chosen by the event-name convention**, not the surface:
-  camelCase event keys (`preToolUse`) → camelCase fields (`toolName`,
-  `toolArgs`); PascalCase keys (`PreToolUse`) → snake_case (`tool_name`,
-  `tool_input`). The kit uses **camelCase** event keys. Scripts normalize both
-  casings anyway as cheap insurance.
+- **Observed CLI payload (1.0.68, Windows):** camelCase fields (`toolName`,
+  `toolArgs`), with `toolArgs` containing a JSON-encoded string rather than a
+  nested object. Scripts decode the string and also accept object-form and
+  snake_case fields for compatibility with other surfaces.
+- The CLI payload had no explicit event-name field. The audit hook infers prompt,
+  tool, and session-end events structurally from `prompt`, `toolName`/
+  `toolResult`, and `reason`.
 - **`preToolUse` command hooks are fail-closed**: a crash or non-zero exit
   **denies** the tool call. This drives the safety principles below.
 - **Decision output** (preToolUse, to stdout):
@@ -86,10 +88,12 @@ deny *every* action and look like model misbehavior. Every guard script must:
    *content* contains `rm -rf` is not falsely denied.
 3. **Normalize both payload casings** (`toolName`/`tool_name`,
    `toolArgs`/`tool_input`).
-4. **Handle missing parser:** PowerShell has `ConvertFrom-Json` built in; the
+4. **Decode string arguments.** If `toolArgs`/`tool_input` is a string, parse it
+   as JSON before reading `path` or `command`; accept an already-parsed object too.
+5. **Handle missing parser:** PowerShell has `ConvertFrom-Json` built in; the
    bash variant needs `jq`. If `jq` is absent, fall through to `allow` (rule 1),
    never error.
-5. Keep scripts small and dependency-light to minimize crash surface.
+6. Keep scripts small and dependency-light to minimize crash surface.
 
 Scripts are shipped as files under `.github/hooks/scripts/` (`.sh` + `.ps1`
 pairs); the JSON config references them so logic is not inlined in JSON.
@@ -102,7 +106,7 @@ All four are config-driven: the installer writes machine-readable data into
 
 | Hook | Event | Matcher | Behavior | Config data |
 | --- | --- | --- | --- | --- |
-| Restricted-path guard | `preToolUse` | `create\|edit` | Deny when the target resolves outside the workspace (repo + declared editable deps), or matches a restricted glob. | `.agentic/hooks/restricted-paths.txt`, `.agentic/hooks/editable-paths.txt` |
+| Restricted-path guard | `preToolUse` | `create\|edit` | Deny when the target resolves outside the workspace (main repo + declared modifiable sibling repositories), or matches a restricted glob. | `.agentic/hooks/restricted-paths.txt`, `.agentic/hooks/editable-paths.txt` |
 | Dangerous-command guard | `preToolUse` | `bash\|powershell` | Deny when the shell `command` matches a destructive pattern (`rm -rf`, force-push to a protected branch, `curl … \| sh`, `chmod -R 777`, …). | `.agentic/hooks/dangerous-commands.txt` |
 | Audit log | `userPromptSubmitted`, `postToolUse`, `sessionEnd` | — | Append one JSON line per event to a local audit trail. Never blocks. | — |
 | Lint-on-edit | `postToolUse` | `create\|edit` | Run the configured linter on the changed file and inject results as context (postToolUse can inform, not block). No-op if no lint command is configured. | `.agentic/hooks/lint-commands.json` |
@@ -119,12 +123,12 @@ denies with a clear reason on a positive match — otherwise allows.
 It also enforces the **workspace boundary**: the target path is normalized to an
 absolute path, and anything resolving *outside* the repository root is denied
 unless it is under a path declared in `.agentic/hooks/editable-paths.txt` — the
-owned sibling repos ("editable satellites") collected during the instruction
-interview. Read-only reference repos are never listed, which is exactly what
-keeps them read-only. The restricted globs are applied inside editable
-satellites too (relative to the satellite root), so `.env`, `*.pem`, `secrets/`
-etc. stay protected there. Both rules deny only on a positive match and the
-scripts still always exit 0.
+compatibility file containing modifiable sibling repository paths collected
+during the instruction interview. Read-only sibling repositories are never
+listed, which is exactly what keeps them read-only. Restricted globs are applied
+inside modifiable siblings too (relative to the sibling root), so `.env`,
+`*.pem`, `secrets/`, etc. stay protected there. Both rules deny only on a
+positive match and the scripts still always exit 0.
 
 ### Dangerous-command guard
 
@@ -180,15 +184,15 @@ repository root so the hooks are loaded, then run a quick check that triggers a
 guard's `deny` path (e.g. attempt an edit to a restricted path) and its `allow`
 path.
 
-## State File
+## Evidence
 
-Record status in:
+Write evidence through the controller to:
 
 ```text
 .agentic/setup/hooks-state.json
 ```
 
-The state should include:
+The evidence should include:
 
 - which hooks were installed vs. declined;
 - config-data file paths and whether they are populated;
@@ -196,11 +200,14 @@ The state should include:
 - the surface(s) on which hooks were verified;
 - whether hooks were disabled by policy;
 - whether a new session was requested;
-- overall status.
+
+The authoritative status exists only in `initialization-state.json`: `complete`
+for verified selected hooks, `blocked` for a recorded policy restriction, or
+`skipped` when the optional topic is declined.
 
 ## Completion Criteria
 
-`setup hooks` is complete only when:
+`/setup-hooks` is complete only when:
 
 - `.github/hooks/hooks.json` is valid and references existing, executable
   scripts;
@@ -231,7 +238,7 @@ Recommended next step:
 - open a new Copilot session and trigger a guard's deny path to verify
 ```
 
-If hooks are not yet installed, recommend `setup hooks`.
+If hooks are not yet installed, recommend `/setup-hooks`.
 
 If hooks are installed but a guard has not fired its deny path, recommend the
 verification step above.
@@ -239,6 +246,5 @@ verification step above.
 If hooks are disabled by policy, report that and recommend proceeding without
 them.
 
-If all initialization topics (instruction files, tooling, skills, hooks) are
-complete, mark setup as complete and recommend starting the feature flow once it
-exists.
+If all mandatory initialization topics are complete or blocked with a recorded
+environmental reason, mark setup complete and recommend starting `/feature`.

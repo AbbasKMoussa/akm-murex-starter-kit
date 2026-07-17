@@ -10,21 +10,22 @@ specialist. The loop runs in one of **two modes** (the only place mode applies):
 - **Autonomous** — the five steps run back-to-back in one session, ungated,
   surfacing only genuine blockers. Hooks (guards/lint) apply in both modes.
 
-Mode is chosen on loop entry (per story, switchable), shown in `feature status`.
+Mode is chosen before Prime per story and shown in `feature status`.
 
 ## Entry
 
 Invoked via `/feature` or directly as `/story-prime` for the current story, in a
-fresh context. First action: read `state.json` (which story is current),
-`feature.md`, `understanding.md`, and the current `stories/<NN>-<slug>.md`. If the
+fresh context. First check local readiness, then use `feature-show` to identify
+the current story and step. Note the revision, then read `feature.md`,
+`understanding.md`, and the current story artifact. If the
 story has unmet dependencies, say so and point to the prerequisite story.
 
 Confirm the **mode** for this story (default from the feature setting).
 
 ## The five steps
 
-Each step appends its output to the story file and advances the story status:
-`not-started → primed → planned → implemented → reviewed → done`.
+Each step appends its output to the story file, then advances the controller
+step: `prime -> plan -> implement -> review -> learn -> complete`.
 
 | Step | Skill | Persona | Does | Appends |
 | --- | --- | --- | --- | --- |
@@ -70,7 +71,7 @@ implement) with specific findings. HITL gate: pass, or loop back.
 
 If the story surfaced a durable convention, pitfall, or gap, call **`/teach`** to
 persist it in the right place, and flag any new skill/hook worth adding. This is
-the feedback into Stage 1. Mark the story `done`. HITL gate: confirm what was
+the feedback into Stage 1. Advance the story to `complete`. HITL gate: confirm what was
 captured.
 
 ## Mode behavior
@@ -85,25 +86,27 @@ captured.
 
 ## Loop exit (always a gate)
 
-When a story reaches `done`, present the completed story (primer, plan, change
+When a story reaches `complete`, present the completed story (primer, plan, change
 summary, review result, learnings) — this exit is a hard stop in **both** modes.
 Then:
 
-- if more stories remain → `nextCommand`: open a new session and run
-  `/story-prime` for the next story;
-- if all stories are done → `nextCommand`: `/feature-review` (Phase 4).
+- if more stories remain, the controller selects the next at `prime` and derives
+  `/story-prime`;
+- if all stories are complete, it moves to `reviewing` and derives
+  `/feature-review`.
 
 Autonomous mode does **not** auto-advance to the next story.
 
 ## State
 
-`state.json`: `currentStory`, `currentStep` (`prime|plan|implement|review|learn`),
-the story's `status`, the per-story `mode`, `lastApprovedGate`, and `nextCommand`.
-Each story's `status` in the `stories` list is kept in sync.
+Controller-owned `state.json`: `currentStory`, ordered stories with `step`,
+per-story `mode` and `reviewAttempts`, gate/history, and revision. Navigation and
+display status are derived. Review can transition back to `plan` or `implement`.
 
 ## Completion criteria (per story)
 
-A story is `done` when it has a primer, an approved plan, an implementation that
+A story is `complete` when it has a primer, an approved plan, an implementation that
 follows the plan with the story's tests passing (or `blocked` with a reason), a
 passing review against its acceptance criteria, and its learnings captured (or
-explicitly "nothing to capture"). State reflects `done` and the next command.
+explicitly "nothing to capture"). State reflects `complete`; the controller
+derives what follows.

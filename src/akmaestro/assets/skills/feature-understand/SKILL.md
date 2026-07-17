@@ -18,18 +18,25 @@ default** and hunt for what's missing. No solutioning here.
 
 ## Entry
 
-Fresh context. If starting a feature, ask for a short title (+ optional ticket id),
-derive `feature-id`, create `.agentic/features/<feature-id>/`, and register it in
-`index.json`. If resuming, read `state.json`.
+Fresh context. Read `.agentic/STATE-PROTOCOL.md`, run `setup-status`, then run
+`readiness-check`. If required local items are missing, follow the confirmed
+remediation procedure in `/feature`; never send a developer through `/init`.
+
+Run `feature-list`. If starting a feature, ask for a short title and optional
+ticket id, derive `feature-id`, and call `feature-create`. If resuming among
+multiple features, use the valid local selection or ask and call
+`feature-select`. Run `feature-show`, require phase `understanding`, and note its
+revision. Never create or update `index.json` and never edit `state.json`.
 
 ## Sources
 
 - **Always:** the codebase + Graphifyy graph (affected/related areas), `AGENTS.md`,
   any links/files the user gives, and online sources you can fetch.
-- **Declared dependency repos** (`AGENTS.md` → Workspace & Dependencies): use
-  their Graphifyy graphs for a high-level map; open a read-only dep's code only
-  when a specific behavior matters. Findings in read-only deps are **fixed
-  constraints** — you adapt to them, you don't change them — record them as such.
+- **Declared sibling repositories** (`AGENTS.md` → Workspace & Dependencies): use
+  their Graphifyy graphs for a high-level map; open a read-only sibling's code
+  only when a specific behavior matters. Findings in read-only sibling
+  repositories are **fixed constraints** — adapt to them, do not change them —
+  and record them as such.
 - **Jira/wiki (optional, credential-gated):** if `JIRA_TOKEN`/`JIRA_BASE_URL` or
   `WIKI_TOKEN`/`WIKI_BASE_URL` are set in the environment, pull the ticket/pages
   directly. Otherwise ask the user to paste the content or give a fetchable link,
@@ -40,8 +47,7 @@ derive `feature-id`, create `.agentic/features/<feature-id>/`, and register it i
 
 - synthesize all sources into one problem statement + current-behavior description;
 - map affected areas/modules via Graphifyy + `AGENTS.md` — across this repo and
-  the declared dependency repos, marking each dependency area editable or
-  read-only;
+  the declared sibling repositories, marking each area modifiable or read-only;
 - surface unstated assumptions, ambiguities, and **edge cases the ticket omitted**;
 - list unknowns and ask the user targeted questions to close them.
 
@@ -78,14 +84,15 @@ This is a collaboration (HITL) — think out loud and iterate with the user.
 ## Gate (hard stop — understand first)
 
 Iterate until the user confirms it reflects reality and open questions are
-answered or explicitly deferred. On approval: set `phase: "understood"`,
-`lastApprovedGate: "understand"`, `nextCommand: "/feature-frame"` in `state.json`;
-tell the user to open a new session and run **`/feature-frame`** — or, if this
-session is still light (short history, few files read), offer to continue with
-`/feature-frame` right here.
+answered or explicitly deferred. Write `understanding.md` first. On approval,
+call `feature-advance --id <feature-id> --gate understand --expected-revision
+<revision>`. The controller moves the phase to `framing`; report its derived
+`/feature-frame` command. Tell the user to open a new session and run it, or, if
+this session is still light, offer to continue here.
 
 ## Completion
 
 `understanding.md` exists with problem, current behavior, affected areas, edge
 cases/ambiguities, open questions, and sources; the user confirmed it; state
-records the approval and next command.
+records the approved gate. A stale revision is a stop-and-reread condition, never
+a reason to rewrite state manually.

@@ -4,9 +4,8 @@
 # PAYLOAD SHAPE (captured from GA Copilot CLI 1.0.68, 2026-07-06): toolArgs is a
 # JSON-ENCODED STRING (e.g. "{\"command\":\"...\"}"), not a nested object, so we
 # parse it a second time (fromjson) before reading `command`. Object-form is
-# still accepted. STATUS: the PowerShell twin is live-verified on the Windows
-# CLI; this bash variant is fixed by analogy and confirmed against the captured
-# payload + CI, pending a live bash-surface re-confirmation.
+# still accepted. STATUS: both variants pass captured-payload tests; live
+# post-fix denial remains pending, including a Bash-surface run.
 #
 # Denies shell commands matching a pattern in
 # .agentic/hooks/dangerous-commands.txt.

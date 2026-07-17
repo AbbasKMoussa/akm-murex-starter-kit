@@ -1,4 +1,4 @@
-# Copilot Hooks (DRAFT — untested against a live Copilot CLI)
+# Copilot Hooks
 
 This directory holds the kit's recommended hook set. Config is `hooks.json`;
 logic lives in `scripts/` as `.sh` + `.ps1` pairs. Repo-specific data lives in
@@ -19,19 +19,19 @@ uncertainty (unparseable payload, missing field, missing `jq`, unknown tool).
 They emit a `deny` only on a positive match against a glob/pattern. A bug should
 never be able to block every action.
 
-## Before trusting these (must verify on the GA Copilot CLI)
+## Verification status
 
-1. The exact `toolArgs` field carrying the file path for `create`/`edit`
-   (scripts check `path`/`file_path`/`filePath`/`filename`/`file`).
-2. That the shell command lives in `toolArgs.command`.
-3. The `postToolUse` context-injection field is VERIFIED as `additionalContext`.
+1. Copilot CLI 1.0.68 on Windows sends `toolArgs` as a JSON-encoded string;
+   `create`/`edit` use `path`, and the shell tool uses `command`. Scripts also
+   accept object-form arguments and defensive alternate field names.
+2. The `postToolUse` context-injection field is verified as `additionalContext`.
    Caveat: copilot-cli#2980 — the CLI does not always forward it into the context
    window (never for MCP tool calls), so lint findings may not always reach the
    agent.
-4. `lint-on-edit.ps1` command execution uses `cmd.exe /c` (Windows); adjust for
+3. `lint-on-edit.ps1` command execution uses `cmd.exe /c` (Windows); adjust for
    PowerShell Core on Linux/macOS.
-5. Each guard fires **both** its `allow` and `deny` paths (e.g. attempt an edit
-   to `.env` → expect deny; edit an ordinary file → expect allow).
+4. Automated tests exercise allow and deny paths. A post-fix live denial check,
+   live Bash run, and VS Code run remain required before broad rollout.
 
 ## Dependencies
 

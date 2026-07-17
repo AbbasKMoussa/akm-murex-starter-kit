@@ -51,9 +51,10 @@ def _report_init(results) -> None:
         f"left {len(results['skipped'])} existing file(s) untouched."
     )
     print()
-    print("Next: open Copilot (VS Code or CLI) at the repo root and run:")
+    print("Next: the team lead opens Copilot (VS Code or CLI) at the repo root and runs:")
     print("    /init")
     print('or say: "let\'s run the initialization flow".')
+    print("After /init, review and commit the shared setup so developers can start with /feature.")
 
 
 def _report_update(results) -> None:

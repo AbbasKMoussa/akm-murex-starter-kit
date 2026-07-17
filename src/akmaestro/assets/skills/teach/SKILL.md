@@ -110,8 +110,8 @@ whether the lesson is already present or contradicted:
 2. If the **target file does not exist** (a new module `AGENTS.md`, a new
    `<topic>.instructions.md`), create it — new files may be created directly. For
    a new `.instructions.md`, add the `applyTo` frontmatter. For a missing module
-   `AGENTS.md`, prefer suggesting `init module <path>` if the module warrants full
-   setup; otherwise create a minimal one.
+   `AGENTS.md`, prefer suggesting `/setup-instructions module <path>` if the
+   module warrants full setup; otherwise create a minimal one.
 3. If the file **exists**, never overwrite or weaken existing content without
    confirmation. Appending a new line under the right heading is fine after you
    have shown it; replacing or rewording existing lines requires an explicit OK.

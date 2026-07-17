@@ -31,7 +31,8 @@ names and payload fields), `/init` end-to-end, and the Stage 2 handoffs.
 
 Past runs are archived under `results/` — see
 `results/2026-07-06-copilot-cli-1.0.68-windows.md`, the run that caught the
-`toolArgs`-is-a-string fail-open bug (fixed in v0.4.1).
+`toolArgs`-is-a-string fail-open bug (fixed in v0.4.1). The v0.5 run must also
+verify the deterministic state controller and lead/developer readiness split.
 
 Phases 5–7 are interactive: the agent will ask you questions (that *is* the
 flow being tested). Budget ~30–45 minutes for phases 0–6; phase 7 (Stage 2) is

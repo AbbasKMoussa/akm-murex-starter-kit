@@ -2,7 +2,7 @@
 
 A hands-on guide to test the whole kit yourself: install it, run Stage 1
 (`/init`), and drive a Stage 2 feature that spans **three repos** — your main
-app plus a dependency you own (editable) and one you only read (reference).
+app plus a sibling repository you own (modifiable) and one you only read.
 
 This is the human counterpart to `PROMPT.md` (which hands the checks to the
 agent). Here *you* drive and watch. Budget ~45–60 min.
@@ -23,14 +23,15 @@ agent). Here *you* drive and watch. Budget ~45–60 min.
 ```
 akm-workspace/
 ├── app-a/      ← MAIN repo. Kit installed here. All /feature state lives here.  (flow home)
-├── lib-b/      ← EDITABLE dependency. You own it; the agent may change it.       (../lib-b)
-└── vendor-c/   ← READ-ONLY reference. You consult it; the agent must never edit. (../vendor-c)
+├── lib-b/      ← MODIFIABLE sibling. You own it; the agent may change it.      (../lib-b)
+└── vendor-c/   ← READ-ONLY sibling. Consult it; the agent must never edit it.  (../vendor-c)
 ```
 
 - **app-a** is the *flow home*: one feature = one spine of state, even when a
   story also changes `lib-b`.
 - **lib-b** is functionally part of the app, just in its own git repo. Stories
-  can change it; it's whitelisted in `.agentic/hooks/editable-paths.txt`.
+  can change it; its path is listed in the compatibility file
+  `.agentic/hooks/editable-paths.txt`.
 - **vendor-c** is another team's code. The agent reads it to understand behavior
   (via its Graphifyy graph, and its source when needed) but is **blocked** from
   editing it. A change it *seems* to need becomes an external dependency to
@@ -64,7 +65,7 @@ Copy-paste this to create three tiny, coherent repos. The toy feature will be
 ```bash
 mkdir akm-workspace && cd akm-workspace
 
-# vendor-c — READ-ONLY reference (the legacy rule app-a must match, can't change)
+# vendor-c — READ-ONLY sibling (the legacy rule app-a must match, can't change)
 mkdir vendor-c && cd vendor-c && git init -q
 cat > discount.py <<'EOF'
 def legacy_discount_rate(tier):
@@ -73,7 +74,7 @@ def legacy_discount_rate(tier):
 EOF
 git add -A && git commit -qm "vendor-c: legacy pricing rule" && cd ..
 
-# lib-b — EDITABLE dependency (you own it)
+# lib-b — MODIFIABLE sibling repository (you own it)
 mkdir lib-b && cd lib-b && git init -q
 cat > pricing.py <<'EOF'
 def apply_discount(price, tier):
@@ -125,7 +126,7 @@ cat .agentic/hooks/editable-paths.txt   # only comments so far — nothing outsi
 
 ---
 
-## Part 3 — Open a fresh Copilot session
+## Part 3 — Team lead opens a fresh Copilot session
 
 Start a **new** session at the `app-a` root:
 
@@ -142,7 +143,7 @@ You should see `/init`, `/doctor`, `/teach`, `/feature`, and the `setup-*` /
 
 ---
 
-## Part 4 — Stage 1: run `/init` (declare the workspace)
+## Part 4 — Team lead runs `/init` and commits it
 
 Run:
 
@@ -156,8 +157,8 @@ Dependencies* — this is the multi-repo part. Answer:
 | Prompt | Your answer |
 |---|---|
 | Does this repo depend on other locally checked-out repos? | Yes |
-| `../lib-b` — role? | **Editable** — we own it; part of the app. Changes reach app-a by import/rebuild. |
-| `../vendor-c` — role? | **Read-only reference** — consult only, never edit. |
+| `../lib-b` — role? | **Modifiable sibling repository** — we own it; part of the app. Changes reach app-a by import/rebuild. |
+| `../vendor-c` — role? | **Read-only sibling repository** — consult only, never edit. |
 
 - **Tooling** topic: it will try to build a Graphifyy graph for app-a **and for
   each declared dependency** (lib-b and vendor-c). If graphify needs an API key
@@ -170,7 +171,13 @@ real `AGENTS.md`. **Verify the workspace was recorded correctly:**
 ```bash
 grep -A8 "Workspace & Dependencies" AGENTS.md      # both deps, with roles
 cat .agentic/hooks/editable-paths.txt              # MUST contain ../lib-b, MUST NOT contain ../vendor-c
+uv run --no-project python .agentic/bin/akmaestro-state.py setup-status
+git check-ignore .agentic/local/readiness.json     # MUST be ignored
 ```
+
+Also inspect `.agentic/setup/environment-requirements.json`: it should require
+`uv`, Graphifyy, the selected `lsp-*`, and graph artifacts for all three repos.
+Review the shared diff and commit it. Do not add anything under `.agentic/local/`.
 
 > ✅ **Check 1 (the crux of the model):** `../lib-b` is in `editable-paths.txt`;
 > `../vendor-c` is **not**. If vendor-c ended up in there, the boundary isn't
@@ -202,7 +209,7 @@ JSON-encoded string). Use `pwsh` on Windows, `bash` on macOS/Linux:
 # Windows
 $g = ".github\hooks\scripts\restricted-path-guard.ps1"
 '{"toolName":"edit","toolArgs":"{\"path\":\"../vendor-c/discount.py\"}"}' | pwsh -ExecutionPolicy Bypass -File $g   # expect DENY (read-only, outside repo)
-'{"toolName":"edit","toolArgs":"{\"path\":\"../lib-b/pricing.py\"}"}'     | pwsh -ExecutionPolicy Bypass -File $g   # expect ALLOW (editable satellite)
+'{"toolName":"edit","toolArgs":"{\"path\":\"../lib-b/pricing.py\"}"}'     | pwsh -ExecutionPolicy Bypass -File $g   # expect ALLOW (modifiable sibling)
 '{"toolName":"edit","toolArgs":"{\"path\":\".env\"}"}'                    | pwsh -ExecutionPolicy Bypass -File $g   # expect DENY (restricted glob)
 '{"toolName":"edit","toolArgs":"{\"path\":\"checkout.py\"}"}'             | pwsh -ExecutionPolicy Bypass -File $g   # expect ALLOW (in-repo)
 ```
@@ -217,7 +224,7 @@ printf '%s' '{"toolName":"edit","toolArgs":"{\"path\":\"checkout.py\"}"}'       
 ```
 
 > ✅ **Check 2:** vendor-c → deny, lib-b → allow, `.env` → deny, in-repo → allow.
-> This proves the boundary distinguishes editable from read-only deps.
+> This proves the boundary distinguishes modifiable from read-only siblings.
 
 ### 5c. Live guard fire (CLI, hooks enabled)
 
@@ -240,15 +247,25 @@ Expect that to **succeed**.
 
 ## Part 6 — Stage 2: a cross-repo feature
 
-Fresh session, then:
+Open a fresh **developer** session from the initialized commit. Do not rerun
+`/init`; run:
 
 ```text
 /feature
 ```
 
+It must probe this developer's local requirements. If something is missing, it
+shows the structured remediation action and asks before running it. Decline once
+to confirm feature creation remains blocked, then approve/remediate and rerun.
+If Graphifyy was documented as blocked during `/init`, it must be made available
+now; Stage 2 does not bypass mandatory developer readiness.
+
 Start a feature — title it **"tier discounts at checkout"**. Then walk the phases
 (`/feature-understand` → `/feature-frame` → `/feature-split` → the per-story
 loop). Watch for these multi-repo behaviors:
+
+Confirm there is no `.agentic/features/index.json`; this worktree's selection is
+`.agentic/local/active-feature.json` and remains ignored.
 
 **Understand** — it should pull context from app-a, lib-b, **and** vendor-c
 (reading the legacy rate table in `vendor-c/discount.py`), and record vendor-c's
@@ -267,7 +284,7 @@ under `.agentic/features/<id>/stories/` should have a **Repos** line.
 
 - the agent edits `../lib-b/pricing.py` and runs **lib-b's own** test
   (`test_pricing.py`) — following lib-b's build/test, not app-a's;
-- the guard permits the lib-b edit (it's editable) but would block a vendor-c
+- the guard permits the lib-b edit (it's modifiable) but would block a vendor-c
   edit.
 
 > ✅ **Check 5 (the genuinely unproven bit):** can the CLI session rooted at
@@ -299,7 +316,7 @@ its change is committed there, and app-a consumes it.
 The checks above (✅ 1–5) are the spine. For each: pass/fail + what you saw.
 The three highest-value findings:
 
-1. **Check 1** — did the roles route correctly (lib-b editable, vendor-c not)?
+1. **Check 1** — did the roles route correctly (lib-b modifiable, vendor-c read-only)?
 2. **Check 3** — did the guard actually fire live to block the vendor-c edit?
 3. **Check 5** — could the app-a session read/write lib-b across the repo
    boundary at all, or did the surface refuse it? (If refused, the multi-repo
@@ -309,4 +326,3 @@ The three highest-value findings:
 Plus anything confusing, any file written you didn't expect, and (if a guard
 failed to fire) the raw audit line for that call from
 `.agentic/audit/<date>.jsonl`.
-```

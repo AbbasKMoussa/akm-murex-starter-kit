@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://akmaestro.internal/schemas/local-readiness.schema.json",
+  "title": "AKMaestro worktree-local readiness result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "version",
+    "requirementsHash",
+    "status",
+    "checks",
+    "checkedAt"
+  ],
+  "properties": {
+    "$schema": { "const": "../schemas/local-readiness.schema.json" },
+    "version": { "const": 2 },
+    "requirementsHash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "status": { "enum": ["ready", "not_ready"] },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "type", "required", "status", "detail"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,99}$"
+          },
+          "type": { "enum": ["tool", "artifact"] },
+          "required": { "type": "boolean" },
+          "status": { "enum": ["ok", "missing"] },
+          "detail": { "type": "string" },
+          "remediation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["command"],
+            "properties": {
+              "command": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "cwd": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "checkedAt": { "type": "string", "format": "date-time" }
+  }
+}

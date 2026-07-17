@@ -8,9 +8,10 @@ agreed `feature.md`.
 
 ## Entry
 
-Invoked via `/feature` or directly as `/feature-frame`, in a fresh context. First
-action: read `state.json` and `understanding.md`. If understanding hasn't been
-approved yet, send the user back to `/feature-understand`.
+Invoked via `/feature` or directly as `/feature-frame`, in fresh context. Check
+local readiness, run `feature-show`, require `framing`, note its revision, and
+read `understanding.md`. If understanding is not approved, return to
+`/feature-understand`.
 
 ## Meet the dev where they are (adaptive approach)
 
@@ -70,13 +71,14 @@ Alternatives considered: <1-line each, why not>
 
 Present `feature.md` and iterate until the user approves. On approval:
 
-- record `phase: "framed"` and the approval in `state.json`;
+- write `feature.md`, then call controller gate `frame` with the expected
+  revision (which moves the phase to `splitting`);
 - tell the user: **open a new session and run `/feature-split`**.
 
 ## State
 
-`state.json`: `phase` (`framing` → `framed`), `lastApprovedGate: "frame"`,
-`nextCommand: "/feature-split"`.
+Controller-owned `state.json`: phase `framing` -> `splitting`, approved `frame`
+gate, revision/history. `/feature-split` is derived.
 
 ## Completion criteria
 
@@ -84,4 +86,4 @@ Complete when `feature.md` exists with problem & context, out-of-scope, a
 high-level solution approach (noting whether it came from the dev or brainstorming)
 with alternatives, testable acceptance criteria covering the understood edge
 cases, and risks/open questions; the user has approved it; and `state.json`
-records the approval and next command.
+records the approved gate.

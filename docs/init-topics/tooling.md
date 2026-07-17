@@ -34,17 +34,10 @@ Then continue with setup.
 
 Graphifyy is installed from the official `graphifyy` package. The CLI command is `graphify`.
 
-Preferred install:
+Install with the required `uv` runtime:
 
 ```bash
 uv tool install graphifyy
-```
-
-Fallbacks:
-
-```bash
-pipx install graphifyy
-pip install graphifyy
 ```
 
 For VS Code Copilot Chat:
@@ -59,10 +52,9 @@ Build the repo graph from the repository root:
 graphify extract .
 ```
 
-If `AGENTS.md` declares workspace dependencies (editable or read-only), build a
-graph for each of them too — high-level understanding of a read-only dependency
-is exactly what its graph provides, so the agent only opens its code when a
-specific behavior matters:
+If `AGENTS.md` declares modifiable or read-only sibling repositories, build a
+graph for each too. A read-only sibling's graph provides high-level
+understanding so the agent opens its code only when a specific behavior matters:
 
 ```bash
 (cd ../lib-b && graphify extract .)
@@ -94,13 +86,14 @@ Install or verify the language server for the language(s) chosen by the user.
 Common mappings:
 
 ```text
-TypeScript/JavaScript -> typescript-language-server or built-in VS Code TypeScript support
+TypeScript/JavaScript -> typescript-language-server; built-in VS Code support
+                         alone does not satisfy Copilot CLI readiness
 Python -> pyright
-Java -> jdtls
+Java -> jdtls with a non-interactive probe
 Go -> gopls
 Rust -> rust-analyzer
 C/C++ -> clangd
-C# -> C# language server or OmniSharp
+C# -> C# language server or OmniSharp with a non-interactive probe
 ```
 
 Test the selected LSP with its version command when available:
@@ -112,7 +105,8 @@ rust-analyzer --version
 clangd --version
 ```
 
-For Java and C#, use the appropriate installed language server or IDE extension check.
+For Java and C#, capture a reliable non-interactive command probe. An IDE-only
+extension check cannot establish readiness for Copilot CLI developers.
 
 LSP is complete only when the selected language server is installed/configured and the agent can verify it is available.
 
@@ -123,7 +117,7 @@ After installing Graphifyy or LSP tooling, ask the user to open a new Copilot se
 The new session should run:
 
 ```text
-setup tooling
+/setup-tooling
 ```
 
 or:
@@ -134,15 +128,15 @@ init help
 
 This lets the assistant detect newly installed tools, loaded skills, updated PATH values, and any VS Code/Copilot configuration changes.
 
-## State File
+## Evidence And Shared Requirements
 
-Record status in:
+Write detailed evidence through the state controller to:
 
 ```text
 .agentic/setup/tooling-state.json
 ```
 
-The state should include:
+The evidence should include:
 
 - selected language(s);
 - Graphifyy install command used;
@@ -153,11 +147,18 @@ The state should include:
 - LSP test command(s);
 - LSP test result(s);
 - whether a new session was requested;
-- overall status.
+
+The same step writes committed
+`.agentic/setup/environment-requirements.json` through `requirements-write`.
+It contains structured argument-array probes and confirmed remediation actions
+for required `uv`, `graphify`, each selected `lsp-*`, the main
+`graphify-graph`, and declared sibling graphs. It never contains credentials.
+Topic status exists only in `initialization-state.json` and is changed through
+the controller after evidence and requirements are valid.
 
 ## Completion Criteria
 
-`setup tooling` is complete only when:
+`/setup-tooling` is complete only when:
 
 - Graphifyy is installed;
 - Graphifyy has generated `graphify-out/graph.json`;
@@ -167,12 +168,13 @@ The state should include:
 - `.agentic/setup/tooling-state.json` records the successful results.
 
 If either Graphifyy or LSP is missing, untested, or failing because work is
-incomplete, the topic is partial, not complete.
+incomplete, the topic remains `in_progress`.
 
 **Blocked-not-failed escape.** Tooling is mandatory, but if a step genuinely
 cannot be done in this environment (air-gapped repo, no registry access, org
 policy blocking the install) it is recorded as `blocked` — not `failed` or
-`partial` — with the manual-completion steps written to `tooling-state.json`.
+`in_progress` — with manual-completion steps in the tooling evidence and
+structured remediation in environment requirements.
 LSP is the floor: when LSP is verified but Graphifyy is environmentally blocked,
 tooling is `blocked` and overall setup may still complete (see
 `docs/setup-flow.md`). `blocked` requires a real environment reason, not a

@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://akmaestro.internal/schemas/setup-state.schema.json",
+  "title": "AKMaestro repository initialization state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "version",
+    "revision",
+    "profile",
+    "topics",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "$schema": { "const": "../schemas/setup-state.schema.json" },
+    "version": { "const": 2 },
+    "revision": { "type": "integer", "minimum": 0 },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mandatory", "optional"],
+      "properties": {
+        "mandatory": { "const": ["instructions", "tooling", "skills"] },
+        "optional": { "const": ["hooks"] }
+      }
+    },
+    "topics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instructions", "tooling", "skills", "hooks"],
+      "properties": {
+        "instructions": { "$ref": "#/$defs/mandatoryTopic" },
+        "tooling": { "$ref": "#/$defs/mandatoryTopic" },
+        "skills": { "$ref": "#/$defs/mandatoryTopic" },
+        "hooks": { "$ref": "#/$defs/optionalTopic" }
+      }
+    },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "completedAt": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "topicBase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "optional", "updatedAt"],
+      "properties": {
+        "status": {
+          "enum": ["pending", "in_progress", "complete", "blocked", "skipped"]
+        },
+        "optional": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "blocker": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "blocked" } } },
+          "then": { "required": ["blocker"] }
+        }
+      ]
+    },
+    "mandatoryTopic": {
+      "allOf": [
+        { "$ref": "#/$defs/topicBase" },
+        {
+          "properties": {
+            "optional": { "const": false },
+            "status": {
+              "enum": ["pending", "in_progress", "complete", "blocked"]
+            }
+          }
+        }
+      ]
+    },
+    "optionalTopic": {
+      "allOf": [
+        { "$ref": "#/$defs/topicBase" },
+        { "properties": { "optional": { "const": true } } }
+      ]
+    }
+  }
+}

@@ -13,9 +13,10 @@ testable slice with its own acceptance criteria, with dependencies made explicit
 
 ## Entry
 
-Invoked via `/feature` or directly as `/feature-split`, in a fresh context. First
-action: read `state.json`, `feature.md`, and `understanding.md`. If the feature
-isn't framed/approved yet, send the user back to `/feature-frame`.
+Invoked via `/feature` or directly as `/feature-split`, in fresh context. Check
+local readiness, run `feature-show`, require `splitting`, note its revision, and
+read `feature.md` plus `understanding.md`. If framing is not approved, return to
+`/feature-frame`.
 
 ## Meet the user where they are (HITL)
 
@@ -67,11 +68,11 @@ Create one file per story and update the feature's Stories section.
 ## Dependencies
 - <other story this needs, or "none">
 
-## Status
-not-started   # not-started → primed → planned → implemented → reviewed → done
-
 <!-- Primer, Plan, and Review notes are appended by the Phase 3 steps. -->
 ```
+
+Story Markdown has no Status section. The controller-owned story `step` is the
+single status source.
 
 In `feature.md`, fill the **Stories** section with the ordered list and links.
 
@@ -90,21 +91,20 @@ criteria, dependencies, and the AC-coverage map — and iterate until the user
 approves. On approval:
 
 - write the story files and update `feature.md`;
-- record `phase: "split"`, the story list + order, `currentStory: "01-<slug>"`,
-  and the approval in `state.json`;
+- call `feature-add-stories` once with the ordered ids and expected revision,
+  then call controller gate `split` with the returned revision;
 - tell the user: **open a new session and run `/story-prime`** to start the first
   story.
 
 ## State
 
-`state.json`: `phase` (`splitting` → `split`), `stories` (ordered list with per
--story `status`), `currentStory`, `lastApprovedGate: "split"`,
-`nextCommand: "/story-prime"`.
+Controller-owned `state.json`: phase `splitting` -> `story_loop`, ordered stories
+with initial step `prime`, selected first story, gate/history/revision.
+`/story-prime` is derived.
 
 ## Completion criteria
 
 Complete when every story has a file with its own testable acceptance criteria
 and explicit dependencies; `feature.md`'s Stories section lists them in order;
 every feature acceptance criterion traces to a story; the user has approved the
-breakdown; and `state.json` records the story list, the current story, and the
-next command.
+breakdown; and controller state records the ordered stories and approved gate.

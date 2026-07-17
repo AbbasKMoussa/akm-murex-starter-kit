@@ -13,9 +13,9 @@ per-story `/story-learn`: it catches the bigger, cross-story lessons.
 
 ## Entry
 
-Invoked via `/feature` or directly as `/feature-retro`, in a fresh context. Read
-`state.json`, `feature.md`, all story files (incl. their learnings), and
-`review.md`. Requires the feature review to be approved.
+Invoked via `/feature` or directly as `/feature-retro`, in fresh context. Check
+local readiness, run `feature-show`, require `retrospective`, note the revision,
+and read the feature, story, and review artifacts.
 
 ## What the facilitator does
 
@@ -62,13 +62,14 @@ Resource: `retro-checklist.md` + `retro.template.md`.
 Present `retro.md` and the list of infra changes; apply approved changes via
 `/teach` etc. On approval:
 
-- mark the feature **complete** in `state.json` and update
-  `.agentic/features/index.json` (no longer the active feature);
+- write `retro.md`, then call controller gate `retro` with the expected revision;
+- the controller marks the feature complete and clears this worktree's local
+  selection when applicable;
 - `/feature` prints the feature summary.
 
 ## Completion criteria
 
 The feature is complete when `retro.md` exists with reflection and the AI-infra
 updates (applied via `/teach` or explicitly flagged as follow-ups), approved
-changes are applied, the user has approved, and `state.json` + `index.json` mark
-the feature done.
+changes are applied, the user has approved, and controller-owned `state.json`
+marks the feature complete. No shared feature index exists.

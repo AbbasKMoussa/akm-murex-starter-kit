@@ -1,4 +1,4 @@
-"""Tests for the thin installer: fresh install, idempotency, no-overwrite,
+"""Tests for the asset installer: fresh install, idempotency, no-overwrite,
 --no-hooks, gitignore handling, and dogfood-copy sync."""
 
 import json
@@ -22,6 +22,18 @@ EXPECTED_SKILLS = {
     "feature-review", "feature-retro",
 }
 
+FEATURE_FLOW_SKILLS = {
+    "feature", "feature-understand", "feature-frame", "feature-split",
+    "story-prime", "story-plan", "story-implement", "story-review", "story-learn",
+    "feature-review", "feature-retro",
+}
+
+DEPRECATED_ROLE_TERMS = {
+    "editable satellite",
+    "editable dependency",
+    "read-only reference",
+}
+
 
 def test_fresh_install_lays_down_everything(tmp_path):
     results = installer.init(str(tmp_path))
@@ -38,11 +50,47 @@ def test_fresh_install_lays_down_everything(tmp_path):
     assert (tmp_path / "AGENTS.md").is_file()
     assert (tmp_path / ".github" / "copilot-instructions.md").is_file()
     assert (tmp_path / ".agentic" / "setup").is_dir()
+    assert (tmp_path / ".agentic" / "local").is_dir()
+    assert (tmp_path / ".agentic" / "bin" / "akmaestro-state.py").is_file()
+    assert (tmp_path / ".agentic" / "schemas" / "feature-state.schema.json").is_file()
     assert (tmp_path / ".agentic" / "audit").is_dir()
+    assert ".agentic/local/" in (tmp_path / ".gitignore").read_text().splitlines()
     assert ".agentic/audit/" in (tmp_path / ".gitignore").read_text().splitlines()
 
     assert results["skipped"] == []
     assert len(results["created"]) > 20
+
+
+def test_skill_health_checks_cover_full_bundled_set():
+    for validator in ("setup-skills", "doctor"):
+        text = (ASSETS / "skills" / validator / "SKILL.md").read_text(encoding="utf-8")
+        for skill in EXPECTED_SKILLS:
+            assert f"`{skill}`" in text, f"{validator} does not validate {skill}"
+
+
+def test_feature_skills_enforce_shared_init_and_local_readiness():
+    for name in FEATURE_FLOW_SKILLS:
+        text = (ASSETS / "skills" / name / "SKILL.md").read_text(encoding="utf-8")
+        assert ".agentic/STATE-PROTOCOL.md" in text, name
+        assert "readiness-check" in text, name
+        assert "index.json" not in text or "never" in text, name
+
+
+def test_setup_skills_use_controller_evidence_and_single_status_source():
+    for name in ("setup-instructions", "setup-tooling", "setup-skills", "setup-hooks"):
+        text = (ASSETS / "skills" / name / "SKILL.md").read_text(encoding="utf-8")
+        assert "evidence-write" in text, name
+        assert "setup-status" in text, name
+        assert "Never edit" in text or "never edit" in text, name
+
+
+def test_shipped_assets_use_current_sibling_repo_roles():
+    for path in ASSETS.rglob("*"):
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8").lower()
+        for term in DEPRECATED_ROLE_TERMS:
+            assert term not in text, f"deprecated role term {term!r} in {path}"
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="exec bits are POSIX-only")
@@ -67,13 +115,15 @@ def test_rerun_is_idempotent_and_never_overwrites(tmp_path):
     assert (tmp_path / ".gitignore").read_text() == gitignore_before
 
 
-def test_no_hooks_skips_hooks_audit_and_gitignore(tmp_path):
+def test_no_hooks_skips_hooks_and_audit_but_keeps_local_state_ignore(tmp_path):
     installer.init(str(tmp_path), with_hooks=False)
 
     assert not (tmp_path / ".github" / "hooks").exists()
     assert not (tmp_path / ".agentic" / "hooks").exists()
     assert not (tmp_path / ".agentic" / "audit").exists()
-    assert not (tmp_path / ".gitignore").exists()
+    assert (tmp_path / ".agentic" / "local").is_dir()
+    assert ".agentic/local/" in (tmp_path / ".gitignore").read_text().splitlines()
+    assert ".agentic/audit/" not in (tmp_path / ".gitignore").read_text().splitlines()
     assert (tmp_path / ".github" / "skills" / "init" / "SKILL.md").is_file()
 
 
@@ -233,7 +283,7 @@ HOOK_CASES = [
     ("restricted-path-guard.sh", '{"toolName":"edit","toolArgs":{"path":"README.md"}}', "allow"),
     ("restricted-path-guard.sh", '{"tool_name":"create","tool_input":{"path":"secrets/x.txt"}}', "deny"),
     ("restricted-path-guard.sh", "garbage not json", "allow"),
-    # Workspace boundary: outside the repo and not a declared editable dep.
+    # Workspace boundary: outside the repo and not a declared modifiable sibling.
     ("restricted-path-guard.sh", '{"toolName":"edit","toolArgs":{"path":"../vendor-c/core.py"}}', "deny"),
     ("restricted-path-guard.sh", '{"toolName":"edit","toolArgs":{"path":"/etc/hosts"}}', "deny"),
     ("dangerous-command-guard.sh", '{"toolName":"bash","toolArgs":{"command":"rm -rf /"}}', "deny"),
@@ -327,8 +377,8 @@ def test_powershell_guards_real_cli_payload_shape(tmp_path):
         assert json.loads(proc.stdout)["permissionDecision"] == expected, (script, payload)
 
 
-EDITABLE_CASES = [
-    # A declared editable satellite is writable from the main repo's session…
+MODIFIABLE_SIBLING_CASES = [
+    # A declared modifiable sibling is writable from the main repo's session…
     ('{"toolName":"edit","toolArgs":{"path":"../lib-b/src/mod.py"}}', "allow"),
     # …including via a sneaky in-repo-looking traversal…
     ('{"toolName":"edit","toolArgs":{"path":"src/../../lib-b/ok.py"}}', "allow"),
@@ -339,7 +389,7 @@ EDITABLE_CASES = [
 ]
 
 
-def _satellite_repo(tmp_path):
+def _repo_with_modifiable_sibling(tmp_path):
     repo = tmp_path / "repo-a"
     repo.mkdir()
     (tmp_path / "lib-b").mkdir()
@@ -351,11 +401,11 @@ def _satellite_repo(tmp_path):
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="bash guards are POSIX-only")
-@pytest.mark.parametrize("payload,expected", EDITABLE_CASES)
-def test_workspace_boundary_with_editable_satellite(tmp_path, payload, expected):
+@pytest.mark.parametrize("payload,expected", MODIFIABLE_SIBLING_CASES)
+def test_workspace_boundary_with_modifiable_sibling(tmp_path, payload, expected):
     if not _have("bash") or not _have("jq"):
         pytest.skip("bash and jq required")
-    repo = _satellite_repo(tmp_path)
+    repo = _repo_with_modifiable_sibling(tmp_path)
 
     proc = subprocess.run(
         ["bash", ".github/hooks/scripts/restricted-path-guard.sh"],
@@ -366,11 +416,11 @@ def test_workspace_boundary_with_editable_satellite(tmp_path, payload, expected)
     assert json.loads(proc.stdout)["permissionDecision"] == expected
 
 
-@pytest.mark.parametrize("payload,expected", EDITABLE_CASES)
+@pytest.mark.parametrize("payload,expected", MODIFIABLE_SIBLING_CASES)
 def test_workspace_boundary_powershell(tmp_path, payload, expected):
     if not _have("pwsh"):
         pytest.skip("pwsh required")
-    repo = _satellite_repo(tmp_path)
+    repo = _repo_with_modifiable_sibling(tmp_path)
 
     proc = _run_pwsh("restricted-path-guard.ps1", payload, repo)
 
@@ -396,7 +446,7 @@ def test_audit_log_infers_event_kind_structurally(tmp_path):
 
     lines = list((tmp_path / ".agentic" / "audit").glob("*.jsonl"))
     assert lines, "no audit trail written"
-    recorded = [json.loads(l)["event"] for l in lines[0].read_text().splitlines()]
+    recorded = [json.loads(line)["event"] for line in lines[0].read_text().splitlines()]
     assert recorded == [e for _, e in events]
 
 

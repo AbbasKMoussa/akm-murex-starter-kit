@@ -1,8 +1,8 @@
-"""The installer: a thin file-dropper.
+"""Install AKMaestro's repo-local workflow assets.
 
-All dynamic logic (detection, interview, generation, section-aware merge) lives
-in the skills and runs inside the agent. This module only copies static assets
-into the target repository:
+Detection, interviews, generation, and section-aware merge remain in the skills.
+Deterministic workflow state transitions live in the bundled standard-library
+controller copied to ``.agentic/bin``. This module installs those assets:
 
 - ``init`` never overwrites existing files (decision 6);
 - ``update`` refreshes kit-owned files, where "kit-owned" means the file on
@@ -23,6 +23,7 @@ from typing import Dict, List, Tuple
 from . import __version__
 
 ASSETS = Path(__file__).resolve().parent / "assets"
+STATE_CONTROLLER = Path(__file__).resolve().parent / "state.py"
 
 # Bootstrap pointer files: (asset relative path, destination relative path).
 # Dropped only if the destination is absent, so they never clobber real ones.
@@ -31,6 +32,7 @@ BOOTSTRAP = [
     ("bootstrap/copilot-instructions.bootstrap.md", ".github/copilot-instructions.md"),
 ]
 
+LOCAL_IGNORE = ".agentic/local/"
 AUDIT_IGNORE = ".agentic/audit/"
 MANIFEST_REL = ".agentic/setup/kit-manifest.json"
 
@@ -56,12 +58,13 @@ def init(target: str = ".", with_hooks: bool = True) -> Dict[str, List[str]]:
             results["created"].append(dst_rel)
             manifest["files"][dst_rel] = _sha256(data)
 
-    # The audit dir and its gitignore entry only exist for the audit-log hook,
-    # so they are installed together with the hooks.
+    # The audit dir only exists for the audit-log hook. Worktree-local workflow
+    # state exists for every installation and is never committed.
     if with_hooks:
         _make_executable(root / ".github" / "hooks" / "scripts")
         (root / ".agentic" / "audit").mkdir(parents=True, exist_ok=True)
-        _ensure_gitignore(root, results)
+    (root / ".agentic" / "local").mkdir(parents=True, exist_ok=True)
+    _ensure_gitignore(root, results, with_audit=with_hooks)
 
     # Runtime state dir (the setup skills write into this).
     (root / ".agentic" / "setup").mkdir(parents=True, exist_ok=True)
@@ -107,6 +110,9 @@ def update(target: str = ".", force: bool = False) -> Dict[str, List[str]]:
     if hooks_installed:
         _make_executable(root / ".github" / "hooks" / "scripts")
 
+    (root / ".agentic" / "local").mkdir(parents=True, exist_ok=True)
+    _ensure_gitignore(root, results, with_audit=hooks_installed)
+
     _save_manifest(root, manifest)
     return results
 
@@ -114,6 +120,9 @@ def update(target: str = ".", force: bool = False) -> Dict[str, List[str]]:
 def _mappings(with_hooks: bool) -> List[Tuple[Path, str]]:
     """All (asset file, posix destination relative path) pairs."""
     pairs = _tree_pairs(ASSETS / "skills", ".github/skills")
+    pairs += _tree_pairs(ASSETS / "schemas", ".agentic/schemas")
+    pairs += _tree_pairs(ASSETS / "runtime", ".agentic")
+    pairs.append((STATE_CONTROLLER, ".agentic/bin/akmaestro-state.py"))
     if with_hooks:
         pairs += _tree_pairs(ASSETS / "hooks", ".github/hooks")
         pairs += _tree_pairs(ASSETS / "hooks-data", ".agentic/hooks")
@@ -164,15 +173,23 @@ def _make_executable(scripts_dir: Path) -> None:
         sh.chmod(mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 
-def _ensure_gitignore(root: Path, results: Dict[str, List[str]]) -> None:
+def _ensure_gitignore(
+    root: Path,
+    results: Dict[str, List[str]],
+    with_audit: bool,
+) -> None:
     gi = root / ".gitignore"
-    line = AUDIT_IGNORE
     existing = gi.read_text(encoding="utf-8").splitlines() if gi.exists() else []
-    if any(l.strip() == line for l in existing):
+    wanted = [LOCAL_IGNORE]
+    if with_audit:
+        wanted.append(AUDIT_IGNORE)
+    missing = [line for line in wanted if not any(item.strip() == line for item in existing)]
+    if not missing:
         return
     with gi.open("a", encoding="utf-8") as fh:
         if existing and existing[-1].strip():
             fh.write("\n")
-        fh.write("# Local agent audit trail written by the audit-log hook — never commit.\n")
-        fh.write(line + "\n")
-    results["created"].append(".gitignore (+audit ignore)")
+        fh.write("# Developer-local AKMaestro state — never commit.\n")
+        for line in missing:
+            fh.write(line + "\n")
+    results["created"].append(".gitignore (+local state ignores)")

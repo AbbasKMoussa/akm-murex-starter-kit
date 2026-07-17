@@ -1,6 +1,7 @@
 # audit-log.ps1 — observational hook (PowerShell variant)
 #
-# STATUS: DRAFT. Appends one JSON line per event. Never blocks; always exit 0.
+# STATUS: live audit output and structural event inference were verified on
+# Copilot CLI 1.0.68 for Windows. Never blocks; always exits 0.
 
 $ErrorActionPreference = 'SilentlyContinue'
 

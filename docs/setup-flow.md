@@ -5,47 +5,52 @@ the depth; this doc defines the orchestrator, bootstrap, detection, state,
 merge policy, and the unified status/help. Decisions are recorded in
 `docs/setup-flow-decisions.md`.
 
-Stage 1 is run **once per repository**. The outcome: the repo has agent
+Stage 1 is run **once per repository by the team lead**. The outcome: the repo has agent
 instruction files, the kit skills, optional hooks, and verified tooling (LSP +
 Graphifyy) — i.e. it is configured for agentic coding. Stage 2 (the feature
-flow) is a separate, repeatable flow that builds on this.
+flow) is a separate, repeatable flow that every developer starts directly.
 
 ## Delivery and bootstrap
 
-- **Installer:** `uvx akmaestro init` (also `pipx`/`pip`). Source of
-  truth is an internal git repo published to the internal Python registry. The
-  installer is idempotent and re-runnable to upgrade.
-- **Bootstrap = the installer.** It lays down the kit flow-skills
-  (`.github/skills/init`, `.github/skills/doctor`, `.github/skills/teach`) plus a
-  minimal `AGENTS.md`/`.github/copilot-instructions.md` pointer if none exists,
-  so the agent understands the flow. After that, the developer runs `/init` (or
-  says "let's run the initialization flow") on any Copilot surface.
+- **Installer:** `uvx akmaestro init`. `uv` remains a developer prerequisite
+  because it also runs the repo-local state controller. Source of
+  truth is an internal git repo intended for publication to the internal Python
+  registry. The installer is idempotent and never overwrites existing files.
+  Upgrades use `uvx akmaestro update`, which refreshes only files still
+  attributable to the kit and preserves customized files.
+- **Bootstrap = the installer.** It lays down all 18 Stage 1 and Stage 2 skills,
+  schemas/controller, optional hooks, and minimal instruction pointers. After
+  that, the team lead runs `/init`, reviews the output, and commits it. Other
+  developers pull the commit and start with `/feature`.
 - **Never overwrite without confirmation** (decision 6). New files are created
   directly; existing customization is protected by the merge policy below.
 
-### The installer is a thin file-dropper
+### Installer versus runtime responsibilities
 
 All dynamic logic — detection, interview, generation, and section-aware merge —
-lives in the **skills** (run by the agent), not in the installer. `uvx
-akmaestro init` only:
+lives in the **skills**. State validation and transitions live in a bundled
+standard-library controller. `uvx akmaestro init`:
 
-1. copies static assets from the package into the repo, and
+1. copies versioned assets and the state controller into the repo, and
 2. prints the one line that starts the flow ("now run `/init`").
 
 Asset mapping (package → repo):
 
 | In the package | Copied to | Notes |
 | --- | --- | --- |
-| `assets/skills/{init,setup-instructions,setup-tooling,setup-skills,setup-hooks,teach,doctor}/` | `.github/skills/<name>/` | the flow-skills + catalog skill; skipped if a same-named skill the user customized exists |
-| `assets/hooks/hooks.json`, `assets/hooks/scripts/*` | `.github/hooks/` | only when hooks are opted in; merged per decision 14 |
+| `assets/skills/*` | `.github/skills/<name>/` | all 18 Stage 1 + Stage 2 skills; existing same-named files are skipped |
+| `state.py` | `.agentic/bin/akmaestro-state.py` | deterministic standard-library controller, run through `uv` |
+| `assets/schemas/*` | `.agentic/schemas/` | Draft 2020-12 contracts for setup, requirements, readiness, features, and local selection |
+| `assets/runtime/STATE-PROTOCOL.md` | `.agentic/STATE-PROTOCOL.md` | shared mutation/readiness protocol used by every flow skill |
+| `assets/hooks/hooks.json`, `assets/hooks/scripts/*` | `.github/hooks/` | only when hooks are opted in; existing files are skipped by the installer and merged later by `/setup-hooks` when needed |
 | `assets/hooks-data/*` | `.agentic/hooks/` | seed config data |
-| `assets/AGENTS.bootstrap.md`, `assets/copilot-instructions.bootstrap.md` | repo root / `.github/` | minimal pointer files, **only if absent** |
-| (generated) | `.agentic/setup/*` | created by the skills at runtime, not the installer |
+| `assets/bootstrap/AGENTS.bootstrap.md`, `assets/bootstrap/copilot-instructions.bootstrap.md` | repo root / `.github/` | minimal pointer files, **only if absent** |
+| (generated) | `.agentic/setup/*`, `.agentic/features/*` | committed state/evidence created at runtime |
+| (generated) | `.agentic/local/*` | gitignored worktree readiness, selection, locks, and temporary inputs |
 
 The installer copies templates verbatim. Repo-specific generation (filling
 `AGENTS.md` from detected facts + answers, section-merging into existing files)
-is done by the skills, not by the installer. This keeps the Python package tiny
-and puts ~all the build effort in skill authoring.
+is done by the skills. Skills never hand-edit controller-owned state.
 
 ## Commands and skill decomposition (hybrid: guided + à la carte)
 
@@ -63,8 +68,9 @@ is standardized to `setup-<topic>`.
 
 The `init` orchestrator and the standalone skills share the same per-topic logic
 and the same `.agentic/` state, so running a topic standalone advances the same
-`init status`. Stage 1 therefore ships as five flow-skills (`init` +
-four `setup-*`) alongside the catalog skill `teach` and the health-check `doctor`.
+`init status`. Stage 1 therefore uses five flow-skills (`init` + four
+`setup-*`) alongside `teach` and `doctor`; all 11 Stage 2 skills are already
+present from the same bootstrap.
 
 ### Out of scope
 
@@ -106,7 +112,7 @@ The instruction-files gate is satisfied by the **root** files (root `AGENTS.md`,
 files are tracked in state and **recommended**, but pending modules are reported
 as warnings and do **not** block the mandatory gate. A repo with complex modules
 can complete setup with module files still pending; `init status` keeps surfacing
-them via `init module <path>`.
+them via `/setup-instructions module <path>`.
 
 ## Flow phases
 
@@ -117,19 +123,20 @@ Each topic, whether guided or standalone, runs the same phases:
    from detection so the user mostly confirms rather than types. Keep it short.
 3. **Generate** — produce repo-specific files from detected facts + answers
    (never generic copies), applying the merge policy.
-4. **Persist** — write detected facts, answers, and current step to `.agentic/`.
+4. **Persist evidence** — write stable facts, answers, and topic evidence first.
 5. **Validate** — check the topic's completion criteria (files exist AND
    tools/guards verified). Per-topic criteria must pass (decision: validation
    gate). For instructions this includes **smoke-verify**: run the captured build
    and test commands once to confirm they actually work, so the agent's
    run/verify loop is trustworthy. Smoke-verify is blocked-not-failed (an
    environment that can't build is recorded as `blocked`, not failed).
-6. **Handoff** — report what was done and the recommended next step.
+6. **Commit transition** — use the controller with the expected revision as the
+   final operation; report its derived next step.
 
 ## Preflight detection
 
-Detected once and cached in `.agentic/setup/detected-repo.json`; refreshed on
-re-run. Facts:
+Stable facts are cached in committed `.agentic/setup/detected-repo.json` and
+refreshed on re-run:
 
 - languages and frameworks;
 - package managers and lockfiles;
@@ -139,7 +146,10 @@ re-run. Facts:
 - existing customization files: `AGENTS.md`, `.github/copilot-instructions.md`,
   `.github/instructions/`, nested `AGENTS.md`, `.github/skills/`,
   `.github/hooks/`, `.agentic/`;
-- git state (branch, clean/dirty, remote).
+- declared sibling repository paths and roles.
+
+Branch, clean/dirty status, PATH contents, installed tools, and other
+workstation facts go under `.agentic/local/` and are never committed.
 
 Detection feeds both the interview (pre-filled answers) and generation
 (e.g. build/test commands flow into `AGENTS.md` and `tests.instructions.md`;
@@ -166,20 +176,24 @@ Special cases:
 
 ```text
 .agentic/
+  bin/akmaestro-state.py        # kit-owned deterministic controller
+  schemas/*.schema.json         # versioned state contracts
+  STATE-PROTOCOL.md             # mutation and readiness rules
   setup/
-    initialization-state.json   # overall: profile, per-topic status, current step, session
-    detected-repo.json          # cached preflight facts
+    initialization-state.json   # committed authoritative topic state
+    detected-repo.json          # stable repository facts only
     answers.json                # interview answers
-    instructions-state.json     # per instruction-files topic
-    tooling-state.json          # per tooling topic
-    skills-state.json           # per skills topic
-    hooks-state.json            # per hooks topic
+    environment-requirements.json # committed developer prerequisites/probes
+    instructions-state.json     # topic evidence, no duplicate status
+    tooling-state.json          # topic evidence, no duplicate status
+    skills-state.json           # topic evidence, no duplicate status
+    hooks-state.json            # topic evidence, no duplicate status
     modules/<module-id>.json    # per complex module
     install-log.md              # human-readable log of changes
   hooks/                        # machine-readable hook config data
+  local/                        # readiness, selected feature, locks; gitignored
   audit/                        # local, gitignored audit trail
   features/                     # Stage 2
-  stories/                      # Stage 2
   decisions/                    # Stage 2 / general
 ```
 
@@ -187,29 +201,41 @@ Special cases:
 
 ```json
 {
-  "version": 1,
+  "$schema": "../schemas/setup-state.schema.json",
+  "version": 2,
+  "revision": 7,
   "profile": { "mandatory": ["instructions", "tooling", "skills"], "optional": ["hooks"] },
   "topics": {
-    "instructions": { "status": "complete|partial|pending|blocked", "updatedAt": "…" },
-    "tooling":      { "status": "…" },
-    "skills":       { "status": "…" },
-    "hooks":        { "status": "…", "optional": true }
+    "instructions": { "status": "complete", "optional": false, "updatedAt": "…" },
+    "tooling":      { "status": "blocked", "optional": false, "blocker": "…", "updatedAt": "…" },
+    "skills":       { "status": "complete", "optional": false, "updatedAt": "…" },
+    "hooks":        { "status": "skipped", "optional": true, "updatedAt": "…" }
   },
-  "currentStep": "tooling",
-  "overall": "incomplete|complete",
-  "lastSession": "…"
+  "createdAt": "…",
+  "updatedAt": "…",
+  "completedAt": "…"
 }
 ```
 
-Each topic's own state file holds the detail its topic doc specifies. State is
-the single source of truth for resume and status.
+Legal statuses are `pending`, `in_progress`, `complete`, `blocked`, and optional
+`skipped`. `overall`, next topic, and next command are derived by `setup-status`
+and never persisted. Each topic file is versioned evidence only. Mutations are
+serialized by local directory locks, use optimistic revisions, and replace JSON
+atomically. The human-readable artifact/evidence is written before the state
+transition, so interruption always leaves a resumable boundary.
+
+`environment-requirements.json` contains structured probe and remediation
+argument arrays for mandatory `uv`, Graphifyy version/query checks, selected
+`lsp-*` tools, and graph artifacts. Probes may set a repository-relative `cwd`
+for sibling repositories. `/feature` writes results to gitignored
+`.agentic/local/readiness.json`, keyed by a hash of those requirements.
 
 ## Resumability and multi-session
 
-The flow may span sessions. `/init` reads `initialization-state.json`, reports
-where it stopped, and continues from `currentStep`. Re-running any topic is safe
-(idempotent) and updates the same state. A new Copilot session is requested after
-tooling/skills/hooks installs so newly added tools, skills, and hooks are
+The flow may span sessions. `/init` runs `setup-status` and continues from its
+derived next topic. Re-running a completed transition is idempotent; a stale
+revision forces a reread rather than an overwrite. A new session is requested after
+tooling/skills/hooks changes so newly added tools, skills, and hooks are
 discovered (see those topic docs).
 
 ## Unified status and help
@@ -221,12 +247,12 @@ optional, and gives the single most important next step. Example:
 Setup status (mandatory: instructions, tooling, skills | optional: hooks)
 
 Instruction files: complete
-Tooling:           partial  (LSP ok; Graphifyy graph not generated)
+Tooling:           in_progress  (LSP ok; Graphifyy graph not generated)
 Skills:            complete
 Hooks:             optional — not installed
 
-Overall: incomplete (tooling pending)
-Next: finish Graphifyy in `setup tooling` (graphify extract .)
+Overall: incomplete (tooling in progress)
+Next: finish Graphifyy in `/setup-tooling` (`graphify extract .`)
 ```
 
 `doctor` is the deeper, active health check (probes environment + integrity);
@@ -235,20 +261,24 @@ Next: finish Graphifyy in `setup tooling` (graphify extract .)
 ## Completion and handoff
 
 Setup is complete when `instructions`, `tooling`, and `skills` each pass their
-topic completion criteria. On completion, `init`:
+topic completion criteria or are `blocked` for a recorded environmental reason.
+Blocked mandatory items remain visible as manual follow-ups. On completion,
+`init`:
 
 1. generates/updates **`.github/AGENTIC.md`** — a short, committed
-   discoverability guide so the *whole team* (not just the developer who ran
-   setup) knows what is installed and how to use it: the available skills and how
+   discoverability guide so the whole team knows what is installed and how
+   to use it: the available skills and how
    to invoke them (`/teach`, `/doctor`, …), which hooks are active, where the
    instruction files live, and how to run/verify the app. It is regenerated on
    re-run and linked from `AGENTS.md`/README;
-2. prints a summary of everything installed/generated and hands off to Stage 2:
+2. validates v2 state and prints a summary;
+3. asks the lead to review and commit the shared output, then hands developers
+   directly to Stage 2:
 
 ```text
-Setup complete. Mandatory topics verified; hooks optional/installed.
-Team guide written to .github/AGENTIC.md.
-Next: start the feature flow with `/feature` (Stage 2).
+Setup complete. Mandatory topics verified or documented as blocked; hooks optional/installed.
+Team guide written to .github/AGENTIC.md. Review and commit the shared files.
+Developers: pull the commit and run `/feature`; do not rerun `/init`.
 ```
 
 (The feature flow is Stage 2 and is specified separately.)

@@ -16,9 +16,12 @@ criteria.
 
 ## Entry
 
-Read `state.json`, the current story file (incl. its Primer), `feature.md`. In
-guided mode this is a fresh context; in autonomous mode it follows Prime in the
-same session. If there's no approved primer (guided), send back to `/story-prime`.
+Read `.agentic/STATE-PROTOCOL.md`; run `setup-status` and `readiness-check`.
+Resolve the feature with `feature-list` and `feature-show`; require phase
+`story_loop` and current story step `plan`, and note the revision. Read the
+current story artifact including its Primer and `feature.md`. In guided mode this
+is fresh context; autonomous mode follows Prime. If the Primer is absent, stop
+and send back to `/story-prime`. Never edit controller state directly.
 
 ## Produce the plan
 
@@ -30,9 +33,9 @@ same session. If there's no approved primer (guided), send back to `/story-prime
 
 Planning checklist: within story scope; satisfies the story AC; reuses existing
 patterns in the touched area; tests cover happy + edge cases; no restricted areas;
-no unplanned scope creep; **cross-repo** — no read-only dependency is touched,
-and changes in an editable dependency come first (contract + its own tests, per
-that repo's `AGENTS.md`), then the consuming change here.
+no unplanned scope creep; **cross-repo** — no read-only sibling repository is
+touched, and changes in a modifiable sibling repository come first (contract +
+its own tests, per that repo's `AGENTS.md`), then the consuming change here.
 
 ## Output: append a Plan to the story file
 
@@ -47,17 +50,18 @@ Test plan: <…>
 Risks: <…>
 ```
 
-Set the story `status: planned`.
-
 ## Gate / continue
 
-- **guided** — present the plan; iterate until the user approves; set
-  `currentStep: "implement"`, `nextCommand: "/story-implement"`; tell them to open
-  a new session and run it (or, if this session is still light, offer to continue
-  with Implement right here).
+- **guided** - present the plan and iterate until approval. Write the artifact
+  first, then call `story-transition --feature <feature-id> --story <story-id>
+  --to implement --expected-revision <revision>`. Report the derived
+  `/story-implement` command and offer a fresh session or light-context
+  continuation.
 - **autonomous** — proceed to Implement in this session.
+
+Autonomous mode performs the same transition before implementation.
 
 ## Completion
 
 The story file has an approved Plan (approach, files, steps, test plan, risks)
-within scope; `status: planned`; state updated.
+within scope; controller state advances to `implement`.

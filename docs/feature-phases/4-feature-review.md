@@ -2,7 +2,7 @@
 
 Skill: `/feature-review` · Persona: **QA / Integration reviewer**.
 
-After all stories are `done`, step back and review the feature as a whole, and
+After all stories are `complete`, step back and review the feature as a whole, and
 produce guided manual-testing steps. Always gated/HITL (mode applies only to
 Phase 3).
 
@@ -20,9 +20,10 @@ guide a human can follow to verify it.
 
 ## Entry
 
-Invoked via `/feature` or directly as `/feature-review`, in a fresh context. Read
-`state.json`, `feature.md`, `understanding.md`, and all story files. If any story
-isn't `done`, point back to the per-story loop.
+Invoked via `/feature` or directly as `/feature-review`, in fresh context. Check
+local readiness, run `feature-show`, require `reviewing`, note the revision, and
+read all feature/story artifacts. The controller guarantees all stories are
+complete.
 
 ## What the Reviewer checks (high level)
 
@@ -73,14 +74,16 @@ Resource: `feature-review-checklist.md` + `review.template.md`.
 ## Gate (hard stop)
 
 Present `review.md`. If issues block the feature, send back to the relevant
-story's loop (reopen it). When the user approves:
+story's `plan` or `implement` step through a controller transition. When the user
+approves:
 
-- record `phase: "reviewed"` and the approval in `state.json`;
+- write `review.md`, then call controller gate `feature-review` with the expected
+  revision (moving the phase to `retrospective`);
 - tell the user: **open a new session and run `/feature-retro`**.
 
 ## Completion criteria
 
 Complete when `review.md` exists with an AC verdict, integration findings, a
 tests/build result, and a manual-testing guide; blocking issues are resolved or
-explicitly deferred; the user has approved; and `state.json` records the approval
-and next command.
+explicitly deferred; the user has approved; and controller state records the
+approved gate.

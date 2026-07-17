@@ -15,9 +15,11 @@ Phase 4). Check this story's implementation only.
 
 ## Entry
 
-Read `state.json`, the current story file (Primer, Plan, Implementation),
-`feature.md`, `understanding.md`. In guided mode this is a fresh context;
-autonomous follows Implement.
+Read `.agentic/STATE-PROTOCOL.md`; run `setup-status` and `readiness-check`.
+Resolve the feature with `feature-list` and `feature-show`; require phase
+`story_loop` and current story step `review`, and note the revision. Read the
+current story artifact, `feature.md`, and `understanding.md`. In guided mode this
+is fresh context; autonomous follows Implement. Never edit controller state.
 
 ## Review against plan + acceptance criteria
 
@@ -43,20 +45,21 @@ Sends back to: <plan | implement>   # if send-back
 
 ## Outcome
 
-- **pass** → set `status: reviewed`.
-- **send back** → return to `/story-plan` or `/story-implement` with specific
-  findings. In autonomous mode, re-plan/re-implement internally and re-review,
-  up to a sensible limit; if it can't converge, stop and ask the user.
+- **pass** - write the Review, then transition the story `--to learn` with the
+  revision read at entry.
+- **send back** - write the Review, then transition `--to plan` or `--to
+  implement` with specific findings. The controller records the review attempt.
+  In autonomous mode, re-plan/re-implement and re-review through the same
+  transitions, up to a sensible limit; if it cannot converge, stop and ask.
 
 ## Gate / continue
 
-- **guided** — present the review; on pass set `currentStep: "learn"`,
-  `nextCommand: "/story-learn"`; tell them to open a new session and run it (or,
-  if this session is still light, offer to continue with Learn right here). On
-  send-back, point to the step to redo.
+- **guided** - present the review and report the controller-derived command. On
+  pass, offer `/story-learn` in a fresh or still-light session. On send-back,
+  point to the derived redo step.
 - **autonomous** — on pass, proceed to Learn in this session.
 
 ## Completion
 
-A Review with a verdict; if pass, `status: reviewed` and state updated; if
-send-back, the target step is recorded.
+A Review with a verdict; controller state points to Learn or the exact send-back
+step. A stale transition requires rereading the current implementation and state.

@@ -6,25 +6,23 @@ A Murex-internal kit that bootstraps an existing repository for agentic coding
 with GitHub Copilot (VS Code + CLI), then drives features with a guided,
 BMAD-style flow — an orchestrator cueing a roster of specialist agents.
 
-- **Stage 1 — Setup (once per repo):** install agent instructions, skills,
-  optional hooks, and verify tooling (LSP + Graphifyy). Result: the repo is ready
-  for agentic coding — for the feature flow below *or* plain ad-hoc prompting.
+- **Stage 1 — Setup (once per repo):** generate agent instructions, configure
+  optional hooks, validate the bootstrapped skills, and verify tooling (LSP +
+  Graphifyy). The team lead runs this and commits the result.
 - **Stage 2 — Feature flow (per feature):** take a feature from idea to done
-  through gated phases, each run by a curated specialist.
+  through gated phases. Developers start here; local prerequisites are checked
+  and remediated without rerunning setup.
 
 ## Prerequisites
 
 - **GitHub Copilot** in VS Code or the Copilot CLI.
-- **`uv`** (to run the installer):
+- **`uv`** on the team lead and every developer machine (installer + bundled
+  workflow state controller):
   ```bash
   curl -LsSf https://astral.sh/uv/install.sh | sh                  # macOS/Linux
   ```
   ```powershell
   powershell -c "irm https://astral.sh/uv/install.ps1 | iex"       # Windows
-  ```
-  No `uv` and can't install it? `pipx` works too:
-  ```bash
-  pipx run --spec git+https://github.com/AbbasKMoussa/akm-murex-starter-kit.git akmaestro init
   ```
 
 ## Install into a repo
@@ -43,8 +41,9 @@ Use `--refresh` to pick up the latest version, `--no-hooks` to skip hooks,
 `--path <dir>` to target another directory. Once published to the registry this
 becomes simply `uvx akmaestro init`.
 
-The installer is a thin file-dropper: it copies the kit's skills and hooks in,
-then tells you what to run next. It changes nothing else.
+The installer lays down all 18 skills, the optional hooks, minimal instruction
+pointers, schemas, and the repo-local deterministic state controller. Dynamic
+detection and configuration happen later inside Copilot.
 
 ### Upgrading an already-set-up repo
 
@@ -69,9 +68,9 @@ Skills and hooks are only discovered in a **new** Copilot session. After
 installing (and after any step that adds skills/hooks/tooling), open a fresh
 VS Code window or start a new CLI session at the repo root before continuing.
 
-## Stage 1 — run the setup flow
+## Stage 1 — team lead initializes the repository
 
-In a fresh Copilot session at the repo root:
+The team lead opens a fresh Copilot session at the repo root:
 
 ```text
 /init
@@ -82,9 +81,11 @@ are). `/init` walks four topics — **instructions, tooling, skills, hooks** —
 asking targeted questions, generating repo-specific files, and verifying as it
 goes. It can span multiple sessions and resumes from where you left off. On
 completion it writes **`.github/AGENTIC.md`**, a committed guide so every teammate
-knows what's installed and how to use it.
+knows what's installed and how to use it. Review and commit the resulting shared
+AKMaestro files. `/init` is repository initialization, not a per-developer step.
 
-Everyday skills it installs (usable any time, not just in a flow):
+Everyday helper skills included by the bootstrap (usable any time, not just in a
+flow):
 
 - **`/teach`** — "remember that…" / "from now on…": routes a new rule to the right
   instruction file and refines the wording.
@@ -92,7 +93,8 @@ Everyday skills it installs (usable any time, not just in a flow):
 
 ## Stage 2 — build a feature
 
-Once setup is complete, in a fresh session:
+Once the lead's initialization commit is available, each developer opens a fresh
+session and starts directly with:
 
 ```text
 /feature        # start a feature, resume, or ask "where are we?"
@@ -100,6 +102,11 @@ Once setup is complete, in a fresh session:
 
 Because it's a skill, natural language works too: *"start a feature"*, *"what's
 the status?"*, *"what should I do next?"*, *"resume the feature"*.
+
+`/feature` checks the committed initialization and probes the current developer's
+`uv`, Graphifyy, selected LSPs, and graph artifacts. When something is missing it
+shows the structured remediation action and asks before changing the machine.
+Developers do not rerun `/init`.
 
 It runs gated, BMAD-style phases, each a curated specialist:
 
@@ -111,7 +118,7 @@ Understand → Frame → Split → per-story loop → Feature review → Retrosp
 How it behaves:
 
 - **Fresh context per step.** Each step finishes by saving state and telling you
-  the next command to run **in a new session** — continuity lives on disk
+  the next command to run **in a new session** — shared continuity lives on disk
   (`.agentic/features/<id>/`), not in chat history. Ask `/feature` "where are we?"
   any time to re-orient. When the current session is still light, a step may
   offer to continue right there instead (never between implement and review —
@@ -122,20 +129,22 @@ How it behaves:
   one session, stopping only for real blockers). You pick per story.
 - **It improves the repo as it goes** — the Learn/Retro steps feed lessons back
   into your instructions via `/teach`.
+- **Developer context stays local.** Readiness and the selected feature live in
+  gitignored `.agentic/local/`; feature decisions and transitions are committed.
 
 ### Multi-repo workspaces
 
-If your app spans repos, declare local dependency checkouts during `/init`
+If your app spans repos, declare local sibling-repository checkouts during `/init`
 (they land in `AGENTS.md` → Workspace & Dependencies), each with a role:
 
-- **Editable** — a sibling repo your team owns (e.g. `../lib-b`): functionally
-  part of the application, so stories can change it as part of normal work here.
-  It's whitelisted in `.agentic/hooks/editable-paths.txt`, and its own
-  build/test commands are honored.
-- **Read-only reference** — another team's code (e.g. `../vendor-c`): indexed by
-  Graphifyy/LSP so the agent understands it, read when needed, but **never
-  edited** — the restricted-path guard denies any edit outside the repo and its
-  declared editable dependencies.
+- **Modifiable sibling repository** — a repo your team owns (e.g. `../lib-b`):
+  functionally part of the application, so stories can change it as part of
+  normal work here. Its path is recorded in the compatibility file
+  `.agentic/hooks/editable-paths.txt`, and its own build/test commands are honored.
+- **Read-only sibling repository** — another team's code (e.g. `../vendor-c`):
+  indexed by Graphifyy/LSP so the agent understands it and read when needed, but
+  **never edited**. The restricted-path guard denies edits outside the main repo
+  unless the target is a declared modifiable sibling repository.
 
 ### Optional: pull from Jira / wiki
 

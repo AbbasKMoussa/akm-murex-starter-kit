@@ -16,9 +16,11 @@ feedback into Stage 1.
 
 ## Entry
 
-Read `state.json` and the current story file (Primer, Plan, Implementation,
-Review), `feature.md`. In guided mode this is a fresh context; autonomous follows
-Review.
+Read `.agentic/STATE-PROTOCOL.md`; run `setup-status` and `readiness-check`.
+Resolve the feature with `feature-list` and `feature-show`; require phase
+`story_loop` and current story step `learn`, and note the revision. Read the
+current story artifact and `feature.md`. In guided mode this is fresh context;
+autonomous follows Review. Never edit controller state directly.
 
 ## Capture lessons
 
@@ -42,20 +44,19 @@ task detail. If nothing is worth capturing, record "nothing to capture".
 - (or) nothing durable to capture
 ```
 
-Set the story `status: done`.
-
 ## Loop exit (always a gate, both modes)
 
 Closing a story is a hard stop in **both** modes. Present the completed story
-(primer, plan, change, review, learnings). Then update `state.json`:
+(primer, plan, change, review, learnings). Write Learnings first, then call
+`story-transition --feature <feature-id> --story <story-id> --to complete
+--expected-revision <revision>`.
 
-- more stories remain → `currentStory` = next, `currentStep: "prime"`,
-  `nextCommand: "/story-prime"`; tell the user to open a new session and run it
-  (or, if this session is still light, offer to start the next story's Prime
-  right here). Autonomous does **not** auto-advance to the next story.
-- all stories done → `phase: "story-loop-done"`, `nextCommand: "/feature-review"`.
+The controller either selects the next story at `prime` or moves the feature to
+`reviewing`; use its derived `/story-prime` or `/feature-review` command. Offer
+the normal fresh-session/light-context handoff. Autonomous mode never starts the
+next story automatically.
 
 ## Completion
 
 Learnings recorded (or "nothing to capture"); durable lessons applied via
-`/teach`; `status: done`; state points to the next story or `/feature-review`.
+`/teach`; controller state points to the next story or `/feature-review`.

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://akmaestro.internal/schemas/active-feature.schema.json",
+  "title": "AKMaestro worktree-local active feature",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "version", "featureId", "selectedAt"],
+  "properties": {
+    "$schema": { "const": "../schemas/active-feature.schema.json" },
+    "version": { "const": 2 },
+    "featureId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,99}$"
+    },
+    "selectedAt": { "type": "string", "format": "date-time" }
+  }
+}

@@ -16,8 +16,11 @@ each takeable through one Phase 3 loop.
 
 ## Entry
 
-Fresh context. Read `state.json`, `feature.md`, `understanding.md`. If the feature
-isn't framed/approved, send the user back to `/feature-frame`.
+Fresh context. Read `.agentic/STATE-PROTOCOL.md`; run `setup-status` and
+`readiness-check`, offering confirmed local remediation when needed. Resolve the
+feature with `feature-list` and `feature-show`, require phase `splitting`, and
+note the revision. Then read `feature.md` and `understanding.md`. If phase is
+still `framing`, send the user to `/feature-frame`. Never edit `state.json`.
 
 ## Meet the user where they are (HITL)
 
@@ -36,11 +39,11 @@ First ask: **do you already have a split in mind?**
   value. Bias to **fewer, larger** stories; split only when one is genuinely too
   big for a single Phase 3 loop. Story-level, never a task list.
 - **Order** them; make **dependencies explicit**.
-- **Tag repos.** Mark which repos each story touches: this repo, an editable
-  dependency, or both. A story spanning an editable dependency delivers the
-  dependency-side contract (interface + its tests) before the consuming side. A
-  change needed in a **read-only** dependency can never be a story — record it
-  in `feature.md` as an external dependency/blocker for the owning team.
+- **Tag repos.** Mark which repos each story touches: this repo, a modifiable
+  sibling repository, or both. A story spanning a modifiable sibling delivers
+  the sibling-side contract (interface + its tests) before the consuming side. A
+  change needed in a **read-only sibling repository** can never be a story —
+  record it in `feature.md` as an external dependency/blocker for the owning team.
 - **Trace coverage:** every acceptance criterion in `feature.md` maps to ≥1 story;
   flag any uncovered AC and any story not tracing back to the feature.
 - Each story gets its own testable, behavior-focused acceptance criteria.
@@ -64,26 +67,31 @@ One file per story + update `feature.md`'s Stories section.
 - <other story, or "none">
 
 ## Repos
-- <this repo, and/or `../<editable-dep>` — which repos this story changes>
-
-## Status
-not-started   # not-started → primed → planned → implemented → reviewed → done
+- <this repo, and/or `../<modifiable-sibling>` — which repos this story changes>
 
 <!-- Primer / Plan / Review / Learnings appended by Phase 3 -->
 ```
 
+Do not put a status section in story Markdown. The controller-owned story `step`
+is the only status source.
+
 ## Gate (hard stop)
 
-Present the breakdown — ordered list, each story's AC, dependencies, and the
-AC→story coverage map — and iterate until approved. On approval: write the story
-files, update `feature.md`, set `phase: "split"`, the ordered `stories` list with
-`status`, `currentStory: "01-<slug>"`, `lastApprovedGate: "split"`,
-`nextCommand: "/story-prime"`; tell the user to open a new session and run
-**`/story-prime`** — or, if this session is still light (short history, few
-files read), offer to continue with `/story-prime` right here.
+Present the breakdown, each story's AC/dependencies, and the AC-to-story coverage
+map; iterate until approved. Write all story files and update `feature.md` first.
+Then call one `feature-add-stories --id <feature-id> --story <id-1> --story
+<id-2> ...` command, repeating `--story` in approved order, with `--mode guided`
+and the revision read at entry. Read the returned revision and call
+`feature-advance --id <feature-id> --gate split
+--expected-revision <new-revision>`.
+
+The controller selects the first story, enters `story_loop`, and derives
+`/story-prime`. Print that handoff and offer the normal fresh-session or
+light-context continuation.
 
 ## Completion
 
 Every story has a file with its own AC + explicit dependencies; `feature.md` lists
 them in order; every feature AC traces to a story; the user approved; state records
-the story list, current story, and next command.
+the ordered stories and approved split gate. Stale state is reread and reconciled,
+never overwritten.

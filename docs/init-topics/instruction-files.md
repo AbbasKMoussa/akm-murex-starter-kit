@@ -51,7 +51,7 @@ Creates or updates:
 AGENTS.md
 .github/copilot-instructions.md
 .github/instructions/tests.instructions.md
-.agentic/setup/instructions-state.json
+.agentic/setup/instructions-state.json   # controller-written evidence
 ```
 
 ### Inputs To Collect
@@ -65,7 +65,8 @@ Ask these questions:
 5. How does a developer verify a change works (manual smoke check or steps)?
 6. What should agents know about CI?
 7. What complex modules exist?
-8. Are there other repositories related to this product? If yes, briefly explain each repo and when agents should consider it.
+8. Are there locally checked-out sibling repositories? For each, give its path,
+   purpose, and role: **modifiable** or **read-only**.
 9. What branch naming style should agents follow?
 10. What commit message style should agents follow?
 11. Are there files, directories, or changes agents must not touch without approval?
@@ -91,14 +92,15 @@ Only ask follow-up questions when the answer is incomplete or has direct setup c
 
 ## Workspace & Dependencies
 
-- `<../dep-path>` — **editable** (we own it; functionally part of this
-  application). May be changed as part of work here; follow its own `AGENTS.md`;
-  changes reach this repo via <link / version bump / rebuild>. Also listed in
+- `<../sibling-path>` — **modifiable sibling repository** (we own it;
+  functionally part of this application). May be changed as part of work here;
+  follow its own `AGENTS.md`; changes reach this repo via <link / version bump /
+  rebuild>. Also listed in the compatibility file
   `.agentic/hooks/editable-paths.txt` so the boundary guard permits edits.
-- `<../other-dep>` — **read-only reference** (another team's code). Consult it
-  to understand behavior (its Graphifyy graph first, code when needed); never
-  edit; a needed change there is an external dependency to raise with its
-  owners, not a story.
+- `<../other-sibling>` — **read-only sibling repository** (another team's code).
+  Consult it to understand behavior (its Graphifyy graph first, code when
+  needed); never edit it. A needed change there is an external dependency to
+  raise with its owners, not a story.
 
 ## Stack
 
@@ -154,7 +156,8 @@ The following modules need scoped setup:
 
 - `<path>`: <short purpose/status>
 
-Each complex module should get a nested `AGENTS.md` through `init module <path>`.
+Each complex module should get a nested `AGENTS.md` through
+`/setup-instructions module <path>`.
 
 ## Git Workflow
 
@@ -212,7 +215,10 @@ applyTo: "**/*test*,**/*spec*,**/tests/**,**/test/**"
 - `.github/copilot-instructions.md` exists and points to the canonical instructions;
 - `.github/instructions/tests.instructions.md` exists and includes the test command;
 - **smoke-verify has run**: the captured build and test commands were executed once and passed (or were recorded as `blocked` with a reason — air-gapped, missing deps, long-running — never silently skipped). This is what makes the agent's run/verify loop trustworthy;
-- `.agentic/setup/instructions-state.json` records answers, generated files, pending complex modules, and the smoke-verify result;
+- `.agentic/setup/instructions-state.json` records controller-written evidence
+  for answers, generated files, pending modules, and smoke verification;
+- after evidence is written, the controller makes the authoritative topic
+  transition to `complete` or documented `blocked`;
 - existing instruction files were merged per the section-aware policy, not overwritten.
 
 ## Phase 2: Complex Module Instruction Setup
@@ -312,11 +318,13 @@ Instruction files:
   - backend/auth: pending
 
 Recommended next step:
-- run init module backend/payment
+- run /setup-instructions module backend/payment
 ```
 
-If root instructions are missing, the recommended next step is `init instructions`.
+If root instructions are missing, the recommended next step is
+`/setup-instructions`.
 
-If root instructions are complete but at least one complex module is pending, recommend the next pending `init module <path>` command.
+If root instructions are complete but at least one complex module is pending,
+recommend the next `/setup-instructions module <path>` command.
 
 If all instruction files are complete, mark the instruction-files topic as complete and recommend the next initialization topic.

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://akmaestro.internal/schemas/setup-evidence.schema.json",
+  "title": "AKMaestro setup topic evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "version",
+    "revision",
+    "topic",
+    "evidence",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "$schema": { "const": "../schemas/setup-evidence.schema.json" },
+    "version": { "const": 2 },
+    "revision": { "type": "integer", "minimum": 0 },
+    "topic": {
+      "enum": ["instructions", "tooling", "skills", "hooks"]
+    },
+    "evidence": { "type": "object" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" }
+  }
+}

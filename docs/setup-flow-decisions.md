@@ -1,22 +1,25 @@
 # Setup Flow Decisions
 
 Date: 2026-06-19
+Last updated: 2026-07-14
 
 ## Context
 
-We are designing AKMaestro, a Murex-internal kit that lets teams add agentic coding support to existing repositories. The first major flow is the setup/initialization flow. A later flow will guide feature development from idea to feature spec to stories to write/implement/review cycles.
+AKMaestro is a Murex-internal kit that lets teams add agentic coding support to
+existing repositories. Stage 1 configures the repository; Stage 2 guides feature
+development from understanding through implementation, review, and learning.
 
 ## Desired Setup Outcome
 
 The target experience is:
 
 ```text
-Open Copilot at the root of a repo.
+Team lead installs AKMaestro and opens Copilot at the repository root.
 > Let's run the initialization flow.
 
-The flow runs through guided questions and setup steps.
-Initialization completes.
-The repo now supports agentic coding.
+The lead completes the guided flow and commits the result.
+Developers pull it and run /feature directly.
+/feature verifies and offers to remediate each developer's local tools.
 ```
 
 The flow may span multiple sessions, so setup state must be persisted on disk.
@@ -31,15 +34,25 @@ The flow may span multiple sessions, so setup state must be persisted on disk.
 
    An uninitialized repository cannot know what "initialization flow" means, so something must lay down the flow first. That "something" is a single, versioned, idempotent installer rather than a magic global understanding. After it runs once, everything else is conversational.
 
-   - Distribution: a Python CLI run via `uvx akmaestro init` (also installable with `pipx`/`pip`). This matches the existing `uv tool install graphifyy` idiom in the tooling topic.
-   - Source of truth: an internal git repo, published to the internal Python registry (PyPI / Artifactory).
-   - The installer runs preflight detection, drives the interview, and lays down the repo-local Layer-1 assets. It is idempotent and re-runnable to upgrade.
+   - Distribution: a Python CLI run via `uvx akmaestro init`. The package may be
+     installed by other Python mechanisms, but `uv` remains a workflow runtime
+     prerequisite on every developer machine.
+   - Source of truth: an internal git repo, intended for publication to the
+     internal Python registry (PyPI / Artifactory).
+   - `akmaestro init` is a non-destructive asset installer: it installs all 18
+     skills, optional hooks, schemas, the state protocol/controller, and
+     bootstrap pointers. Detection and interview logic runs later in the skills.
+   - `akmaestro update` upgrades kit-owned files using the SHA-256 manifest while
+     preserving customized files.
 
 3. The model is "installer + repo-local assets" (BMAD-style).
 
-   The installer starts the flow. The initialized repository receives its own instructions, prompts, agents, templates, and state files so future sessions are self-contained and resumable. This mirrors the BMAD method's installed-assets approach.
+   The installer starts the flow. The initialized repository receives its own
+   instructions, skills, optional hooks, templates, and state files so future
+   sessions are self-contained and resumable. This mirrors the BMAD method's
+   installed-assets approach.
 
-4. The flow should persist setup state.
+4. The flow should persist shared setup state and separate local state.
 
    State location:
 
@@ -49,7 +62,9 @@ The flow may span multiple sessions, so setup state must be persisted on disk.
        initialization-state.json
        answers.json
        detected-repo.json
+       environment-requirements.json
        install-log.md
+     local/                    # gitignored active feature, readiness, locks
    ```
 
 5. Generated files should be repo-specific.
@@ -58,7 +73,11 @@ The flow may span multiple sessions, so setup state must be persisted on disk.
 
 6. Never overwrite without confirmation.
 
-   No separate `install-plan.md` artifact is required. The agent may install directly, but it must never overwrite or weaken an existing instruction, prompt, agent, or hook file without showing what it would change and getting confirmation. New files can be created freely; existing customization is protected.
+   No separate `install-plan.md` artifact is required. The agent may install
+   directly, but it must never overwrite or weaken an existing instruction,
+   skill, or hook file without showing what it would change and getting
+   confirmation. New files can be created freely; existing customization is
+   protected.
 
 7. Hooks are optional but installed by default (opt-out).
 
@@ -68,14 +87,18 @@ The flow may span multiple sessions, so setup state must be persisted on disk.
 
    The topic has two phases:
 
-   - root instruction setup through `init instructions`;
-   - complex module instruction setup through `init module <path>` or `init module all`.
+   - root instruction setup through `/setup-instructions`;
+   - complex module setup through `/setup-instructions module <path>` or
+     `/setup-instructions module all`.
 
    See `docs/init-topics/instruction-files.md`.
 
 9. The second agreed initialization topic is tooling.
 
-   The user runs `setup tooling`. The flow asks which language(s) to set up LSP for, then installs/configures and tests both LSP and Graphifyy. This topic is not complete unless both are tested and working.
+   The user runs `/setup-tooling`. The flow asks which language(s) to set up LSP
+   for, then installs/configures and tests both LSP and Graphifyy. This topic is
+   complete when both work, or `blocked` with a genuine environmental reason and
+   recorded manual steps.
 
    See `docs/init-topics/tooling.md`.
 
@@ -93,15 +116,18 @@ The flow may span multiple sessions, so setup state must be persisted on disk.
 
     Skill format and locations are verified in "GitHub Copilot Agent Skills" below.
 
-12. Skills are the third initialization topic (in progress).
+12. Skills are the third initialization topic (decided).
 
-    The topic covers two things: (a) delivering the kit's own flows as agent skills, and (b) installing a curated catalog of reusable skills into the team's `.github/skills/` for daily use. The specific catalog is being designed collaboratively with the user, not taken from a fixed list. Bootstrap option under consideration: a user-level skill in `~/.copilot/skills/` so "run the initialization flow" works in any repo with no per-repo command.
+    The CLI bootstrap installs the complete 18-skill set up front: seven Stage 1
+    skills/helpers and eleven Stage 2 skills. `/setup-skills` validates that fixed
+    bundled set and preserves any additional team-owned skills; it does not defer
+    Stage 2 installation or ask the user to choose a subset.
 
 13. The setup flow is hybrid: guided + à la carte (decided).
 
     `/init` drives the topics in mandatory order and is resumable; each topic also
-    runs standalone (`init instructions`, `setup tooling`, `setup skills`,
-    `setup hooks`). Both share the same per-topic logic and state. See
+    runs standalone (`/setup-instructions`, `/setup-tooling`, `/setup-skills`,
+    `/setup-hooks`). Both share the same per-topic logic and state. See
     `docs/setup-flow.md`.
 
 14. Existing files use section-aware merge + confirm (decided).
@@ -114,8 +140,8 @@ The flow may span multiple sessions, so setup state must be persisted on disk.
 15. Mandatory profile: instructions + tooling + skills; hooks optional (decided).
 
     Setup counts as complete when the instruction-files, tooling, and skills
-    topics are complete. Hooks are recommended (install-by-default) but never block
-    completion and may be disabled by policy.
+    topics are complete or carry a genuine documented `blocked` outcome. Hooks
+    are recommended but never block completion and may be skipped or disabled.
 
 16. Completion gate: per-topic criteria must pass (decided).
 
@@ -145,12 +171,14 @@ The flow may span multiple sessions, so setup state must be persisted on disk.
     the mandatory gate. Complex-module `AGENTS.md` files are tracked and
     recommended but pending modules are warnings, not blockers.
 
-20. The installer is a thin file-dropper; logic lives in skills (decided).
+20. Detection/interview/generation live in skills; state logic is deterministic
+    code (revised decision).
 
-    `uvx akmaestro init` only copies static assets and prints the line
-    that starts the flow. Detection, interview, generation, and section-merge are
-    done by the skills at runtime. See the asset mapping in `docs/setup-flow.md`.
-    MCP servers are explicitly out of scope for Stage 1.
+    `uvx akmaestro init` copies assets and prints the line that starts the flow.
+    Detection, interview, generation, and section merge are done by skills.
+    Legal transitions, validation, locking, revision checks, and atomic writes
+    are handled by the bundled standard-library controller. MCP servers remain
+    out of scope for Stage 1.
 
 21. Execution readiness is part of "ready for agentic coding" (decided).
 
@@ -163,8 +191,32 @@ The flow may span multiple sessions, so setup state must be persisted on disk.
 
     On completion, `init` writes `.github/AGENTIC.md` listing installed skills
     (and how to invoke them), active hooks, instruction-file locations, and
-    run/verify commands — so every teammate who clones the repo is ready, not just
-    the developer who ran setup. Regenerated on re-run; linked from `AGENTS.md`.
+    run/verify commands — so every teammate who clones the repo understands the
+    initialized workflow. Regenerated on re-run; linked from `AGENTS.md`.
+
+23. `/init` is team-lead-owned repository initialization (decided).
+
+    The lead runs the installer and `/init`, then commits the shared output.
+    Other developers never rerun `/init` for workstation setup; they begin with
+    `/feature` after pulling the initialization commit.
+
+24. State uses a hybrid v2 model with a bundled controller (decided).
+
+    Committed state contains setup decisions/evidence, environment requirements,
+    and feature/story progress. `.agentic/local/` contains readiness, active
+    feature selection, locks, and temporary files and is always gitignored.
+    Draft 2020-12 JSON Schemas document the contracts. Controller-owned JSON is
+    updated atomically, guarded by revisions and cross-platform directory locks.
+    Derived navigation and completion fields are not persisted.
+
+25. `/feature` owns per-developer readiness (decided).
+
+    Every feature entry verifies the committed `/init` result and probes local
+    `uv`, Graphifyy version/query probes, selected LSPs, and graph artifacts. Missing requirements
+    block feature mutations. `/feature` shows structured argument-array
+    remediation actions and executes only after user confirmation. The readiness
+    result and active feature selection stay local. There is no v1 migration
+    because the state model was not shipped before v2.
 
 The integrated Stage 1 spec (orchestrator, bootstrap, detection, state schema,
 merge policy, unified status/help) lives in `docs/setup-flow.md`. The four topic
@@ -207,7 +259,7 @@ The initialized target repository may contain:
   copilot-instructions.md   # short pointer to AGENTS.md
   AGENTIC.md                # committed team-discoverability guide (decision 22)
   instructions/             # path-scoped *.instructions.md
-  skills/                   # init, setup-*, teach, doctor, + catalog skills
+  skills/                   # all 18 Stage 1 + Stage 2 skills
   hooks/                    # hooks.json + scripts (optional topic)
 
 AGENTS.md                   # main source of truth
@@ -215,8 +267,11 @@ AGENTS.md                   # main source of truth
 <complex-module>/AGENTS.md  # nested, for complex modules
 
 .agentic/
-  setup/                    # state files (Stage 1)
+  bin/                      # bundled deterministic state controller
+  schemas/                  # versioned Draft 2020-12 state contracts
+  setup/                    # committed repository setup state/evidence
   hooks/                    # machine-readable hook config data
+  local/                    # developer/worktree state, gitignored
   audit/                    # local, gitignored audit trail
   features/                 # Stage 2
   stories/                  # Stage 2
@@ -233,7 +288,9 @@ the full Stage 1 layout and asset mapping are in `docs/setup-flow.md`.
 
 1. Preflight
 
-   Detect repo facts, existing customization files, git state, language/frameworks, package managers, test/build commands, CI, and monorepo shape.
+   Detect stable repo facts, customization files, language/frameworks, package
+   managers, test/build commands, CI, and monorepo shape. Keep branch, dirty
+   status, PATH, and tool availability local.
 
 2. Interview
 
@@ -241,11 +298,14 @@ the full Stage 1 layout and asset mapping are in `docs/setup-flow.md`.
 
 3. Persist
 
-   Write detected facts, answers, and current step to `.agentic/setup/`.
+   Write stable facts, answers, and controller-owned progress to
+   `.agentic/setup/`; write workstation facts to `.agentic/local/`.
 
 4. Install
 
-   Create or merge prompts, agents, hooks, instructions, templates, and state folders. New files are created directly. Before overwriting or weakening any existing customization file, show what would change and get confirmation (see decision 6).
+   Create or merge skills, hooks, instructions, templates, and state folders.
+   New files are created directly. Before overwriting or weakening any existing
+   customization file, show what would change and get confirmation (decision 6).
 
 5. Validate
 
@@ -255,13 +315,12 @@ the full Stage 1 layout and asset mapping are in `docs/setup-flow.md`.
 
    Produce a setup summary explaining what was installed and how to start the feature flow.
 
-## Open Questions
+## Resolved Questions
 
-Resolved: min profile (decision 15), merge policy (decision 14), validation gate
-(decision 16), flow shape (decision 13).
-
-- (Stage 2 is now being designed — see `docs/feature-flow.md` and the Stage 2
-  decisions below.)
+The minimum profile, merge policy, validation gate, flow shape, bootstrap skill
+set, and Stage 2 design are resolved in the decisions above and below. Remaining
+work is workflow improvement and cross-surface validation, not architecture
+selection.
 
 ## Stage 2: Feature Flow Decisions
 
@@ -275,10 +334,12 @@ S2. Working model: fresh context per step. Each step runs in its own Copilot
     history.
 
 S3. A `feature status` / `feature help` command always reports where you are and
-    the exact next command (BMAD-style orientation).
+    the controller-derived next command. Feature directories are the registry;
+    a worktree-local pointer selects among multiple open features.
 
-S4. Gate every boundary. Every phase boundary and every story-step boundary is a
-    hard stop requiring explicit approval before the next step.
+S4. Gate every phase boundary and every guided story-step boundary. Autonomous
+    mode removes only the internal Phase 3 story-step gates; story entry/exit and
+    all other phase boundaries remain hard stops requiring explicit approval.
 
 S5. Phases: Phase 1 is two gated steps — Understand → Frame — then Split →
     per-story loop (Prime → Plan → Implement → Review → Learn) → Feature review →
@@ -291,7 +352,7 @@ S6. The loop feeds Stage 1: `/story-learn` and `/feature-retro` call `/teach` to
     persist new conventions/pitfalls and flag new skills/hooks.
 
 S7. Each step is a curated specialist, carried by the skill (not Copilot custom
-    agents). Each step's `SKILL.md` embeds a named role persona + bundled
+    agents). Each step's `SKILL.md` embeds a named role persona plus
     templates/checklists (BMAD role + dependencies); fresh-context-per-step makes
     each step a focused specialist. We do NOT map 1:1 to BMAD's roster — a leaner
     set (Framer, Planner, Researcher, Architect, Implementer, Reviewer,
@@ -316,18 +377,19 @@ S10. Stories are right-sized — not too small. Bias toward fewer, larger,
      user-meaningful vertical slices; split only when a story is too big for one
      Phase 3 loop. Story-level, never a task list.
 
-S12. Story review and feature review are distinct personas (corrects an earlier
+S11. Story review and feature review are distinct personas (corrects an earlier
      "reuse the Reviewer" shortcut). Phase 3 = close-up code Reviewer (this slice
      vs its plan); Phase 4 = QA / Integration reviewer at feature altitude
      (cross-story integration, whole-feature AC, manual-verification guide).
      Distinct framing + checklists stop the feature review from drifting into
      re-reviewing story internals.
 
-S11. Two modes, scoped to the Phase 3 per-story loop ONLY. The loop runs either
+S12. Two modes, scoped to the Phase 3 per-story loop ONLY. The loop runs either
      autonomous (the five steps back-to-back in one session, ungated) or guided
      (each step gated + fresh context). Phases 1, 2, 4, 5 are always gated
      regardless of mode (S4 still holds for them). Mode is per-story, switchable,
      shown in `feature status`; autonomous removes only the inside-the-loop stops
      and does not auto-advance to the next story. Hooks still apply in both modes.
 
-Open Stage 2 questions are listed at the end of `docs/feature-flow.md`.
+Implementation and remaining verification status are recorded at the end of
+`docs/feature-flow.md`.

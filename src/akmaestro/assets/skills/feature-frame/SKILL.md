@@ -18,8 +18,12 @@ stay high-level here.
 
 ## Entry
 
-Fresh context. Read `state.json` and `understanding.md`. If understanding isn't
-approved, send the user back to `/feature-understand`.
+Fresh context. Read `.agentic/STATE-PROTOCOL.md`; run `setup-status` and
+`readiness-check`, remediating missing local requirements only after confirmation.
+Resolve the feature through `feature-list` and `feature-show`. Require phase
+`framing`, note the revision, then read `understanding.md`. If the controller is
+still in `understanding`, send the user to `/feature-understand`. Never edit
+`state.json` directly.
 
 ## Meet the dev where they are (HITL)
 
@@ -68,14 +72,14 @@ Alternatives considered: <1-line each, why not>
 
 ## Gate (hard stop)
 
-Iterate until the user approves `feature.md`. On approval: set `phase: "framed"`,
-`lastApprovedGate: "frame"`, `nextCommand: "/feature-split"`; tell the user to
-open a new session and run **`/feature-split`** — or, if this session is still
-light (short history, few files read), offer to continue with `/feature-split`
-right here.
+Iterate until the user approves `feature.md`. Write the artifact first. On
+approval call `feature-advance --id <feature-id> --gate frame
+--expected-revision <revision>`. Report the controller-derived `/feature-split`
+command; offer the normal fresh-session handoff or the light-context exception.
 
 ## Completion
 
 `feature.md` exists with problem & context, out-of-scope, a high-level approach
 (noting its origin) with alternatives, testable AC covering the understood edge
-cases, and risks; the user approved it; state records approval and next command.
+cases, and risks; the user approved it; state records the gate. On a stale
+revision, reread and reconcile instead of forcing the transition.

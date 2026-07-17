@@ -1,13 +1,12 @@
 # Initialization Topic: Skills
 
-This topic defines the third setup step for a target repository: installing the
-agent skills the team will use.
+This topic defines the third setup step for a target repository: validating the
+agent skills installed by the bootstrap.
 
 ## Goal
 
-Install a curated catalog of GitHub agent skills into the repository so the team
-gets reusable, best-practice workflows out of the box, invokable on every Copilot
-surface (VS Code, CLI, cloud agent).
+Verify the complete bundled GitHub agent-skill set so Stage 1, Stage 2, and the
+daily helpers are available on every Copilot surface (VS Code, CLI, cloud agent).
 
 Skills are the kit's universal delivery and trigger mechanism. The format and
 locations are fixed by decisions 11–12 and the "GitHub Copilot Agent Skills"
@@ -16,32 +15,21 @@ section in `docs/setup-flow-decisions.md`; in short: a skill is a folder under
 `description`, optional `allowed-tools`) plus any bundled resources, discovered
 automatically or invoked as `/<name>`.
 
-## Two Kinds of Skill
+## Bundled Skill Set
 
-1. **Kit flow-skills** — the kit's own flows delivered as skills so the guided
-   flow works the same on every surface. Current flow-skills: `init` (the guided
-   orchestrator), the four per-topic skills `setup-instructions`, `setup-tooling`,
-   `setup-skills`, `setup-hooks`, and `doctor`
-   (`.github/skills/doctor/SKILL.md`, a read-only health check with an opt-in
-   `--fix` mode). These are laid down by the installer
-   (`uvx akmaestro init`) as part of the bootstrap,
-   *before* this topic runs, because the flow must exist for the flow to run.
-   This topic only verifies they are present and valid.
+`uvx akmaestro init` lays down all 18 skills before the conversational `/init`
+flow runs:
 
-2. **Catalog skills** — reusable, daily-use skills installed for the team. This
-   topic installs the ones the team selects.
+- **Stage 1 and helpers (7):** `init`, `setup-instructions`, `setup-tooling`,
+  `setup-skills`, `setup-hooks`, `teach`, `doctor`.
+- **Stage 2 (11):** `feature`, `feature-understand`, `feature-frame`,
+  `feature-split`, `story-prime`, `story-plan`, `story-implement`,
+  `story-review`, `story-learn`, `feature-review`, `feature-retro`.
 
-### Current Catalog
-
-- `teach` — routes and refines agent instructions: decides where a lesson, rule,
-  convention, or fact belongs (root `AGENTS.md`, a module `AGENTS.md`, a
-  path-scoped `.github/instructions/*.instructions.md`, or personal user-level
-  config) and refines its wording before adding it. Source:
-  `.github/skills/teach/SKILL.md`.
-
-Feature-implementation skills (a BMAD-like idea → spec → stories → implement →
-review flow) are **out of scope here** and are added by the later feature flow
-("part 2"), not by setup.
+This topic verifies them; it does not defer Stage 2 installation or ask the user
+to choose a subset. Non-bundled skills already in the repository are team-owned
+and must be preserved. Invalid additional skills are warnings; they do not block
+the required bundled set.
 
 ## Command
 
@@ -53,21 +41,15 @@ review flow) are **out of scope here** and are added by the later feature flow
 
 ## Inputs To Collect
 
-Keep this short. Ask one question:
+None. The bundled set is fixed by the installed kit version. Report additional
+team-owned skills, but do not ask the user to select or remove them.
 
-```text
-Which catalog skills should I install? (default: all recommended)
-```
+## Verification Behavior
 
-Present the current catalog with a one-line description each and let the user
-accept the recommended set or pick a subset. Do not run a long interview.
+For every bundled skill:
 
-## Install Behavior
-
-For each selected skill:
-
-- Copy the skill folder to `.github/skills/<name>/` (create `.github/skills/` if
-  missing). New skill folders are created directly.
+- Confirm `.github/skills/<name>/SKILL.md` exists. If a bundled skill is missing,
+  recommend `akmaestro update` (or `akmaestro init` for a fresh bootstrap).
 - If a skill of the same name already exists, do not overwrite or downgrade it
   without confirmation. Show what differs and let the user decide (per decision
   6).
@@ -87,12 +69,12 @@ A skill is only "installed" when it is valid and discoverable:
 
 ## New Session Requirement
 
-After installing skills, ask the user to open a new Copilot session at the
-repository root so newly added skills are discovered and `/<name>` invocation is
-available. The new session can run:
+If the bootstrap or an update added skills during the current session, ask the
+user to open a new Copilot session at the repository root so they are discovered.
+The new session can run:
 
 ```text
-setup skills
+/setup-skills
 ```
 
 or:
@@ -103,36 +85,42 @@ init help
 
 to confirm the skills are loaded.
 
-## State File
+## Evidence
 
-Record status in:
+Write evidence through the controller to:
 
 ```text
 .agentic/setup/skills-state.json
 ```
 
-The state should include:
+The evidence should include:
 
-- the catalog version installed from;
-- selected skills and their installed paths;
+- the kit version installed from;
+- the 18 required bundled skills and their installed paths;
+- additional team-owned skills found;
 - per-skill validation result (frontmatter valid, resources present);
-- kit flow-skills present (yes/no);
+- complete bundled set present (yes/no);
 - whether a new session was requested;
-- overall status.
+
+The authoritative topic status exists only in
+`initialization-state.json`. Write evidence first, then make the controller
+transition last.
 
 ## Completion Criteria
 
-`setup skills` is complete only when:
+`/setup-skills` is complete only when:
 
-- the kit flow-skills are present and valid;
-- every selected catalog skill is installed under `.github/skills/<name>/` with
-  valid `SKILL.md` frontmatter and intact bundled resources;
+- all 18 bundled skills are installed under `.github/skills/<name>/` with valid
+  `SKILL.md` frontmatter and intact bundled resources;
+- additional team-owned skills were preserved;
 - no existing skill was overwritten without confirmation;
 - a new session has been requested if skills were added in an existing session;
 - `.agentic/setup/skills-state.json` records the successful results.
 
-If a selected skill is missing, invalid, or unverified, the topic is partial or
-blocked, not complete.
+If a bundled skill is missing, invalid, or unverified, the topic remains
+`in_progress`.
+Use `blocked` only when a real environment or policy constraint prevents repair
+and the manual steps are recorded.
 
 ## Status And Help Behavior
 
@@ -140,19 +128,15 @@ blocked, not complete.
 
 ```text
 Skills:
-- Kit flow-skills: present
-- Catalog:
-  - teach: installed
+- Bundled skills: 18/18 valid
+- Additional team skills: <count>
 
 Recommended next step:
 - open a new Copilot session at the repo root and run init help
 ```
 
-If the kit flow-skills are missing, recommend re-running the installer.
+If a bundled skill is missing, recommend `akmaestro update`.
 
-If catalog skills are selected but not yet installed or validated, recommend
-completing `setup skills`.
-
-If all three initialization topics (instruction files, tooling, skills) are
-complete, mark setup as complete and recommend starting the feature flow once it
-exists.
+If all three mandatory topics (instruction files, tooling, skills) are complete
+or blocked with a recorded environmental reason, mark setup complete and
+recommend starting `/feature`.

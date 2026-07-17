@@ -17,8 +17,11 @@ the agentic setup better than you found it. Always gated/HITL.
 
 ## Entry
 
-Fresh context. Read `state.json`, `feature.md`, all story files (incl. their
-Learnings), and `review.md`. Requires the feature review to be approved.
+Fresh context. Read `.agentic/STATE-PROTOCOL.md`; run `setup-status` and
+`readiness-check`, offering confirmed local remediation when required. Resolve
+the feature with `feature-list` and `feature-show`, require phase
+`retrospective`, and note the revision. Read `feature.md`, all story artifacts,
+and `review.md`. Never edit `state.json` directly.
 
 ## Reflect
 
@@ -63,11 +66,14 @@ files. This is the main loop-back into Stage 1.
 ## Gate + feature completion
 
 Present `retro.md` and the list of infra changes; apply approved changes via
-`/teach` etc. On approval: mark the feature **complete** in `state.json`, clear it
-as active in `.agentic/features/index.json`, and print the feature summary.
+`/teach` etc. Write the artifact and approved infra changes first. On approval,
+call `feature-advance --id <feature-id> --gate retro --expected-revision
+<revision>`. The controller marks the feature complete and clears this
+worktree's local selection when it points to that feature. Print the final
+summary; never update an `index.json`.
 
 ## Completion
 
 `retro.md` exists with reflection + AI-infra updates (applied via `/teach` or
-flagged as follow-ups); approved changes applied; the user approved; `state.json`
-and `index.json` mark the feature done.
+flagged as follow-ups); approved changes applied; the user approved; controller
+state marks the feature complete.

@@ -1,13 +1,13 @@
 # AGENTS.md
 
-> This is a placeholder created by AKMaestro. Run `/init` (the
-> initialization flow) to replace it with real, repo-specific instructions. The
-> `setup-instructions` skill fills in the sections below from detected facts and
-> your answers.
+> This is a placeholder created by AKMaestro. The team lead runs `/init` once to
+> replace it with real, repo-specific instructions and commits the result. Other
+> developers start with `/feature`; the `setup-instructions` skill fills in the
+> sections below from detected facts and the lead's answers.
 
 ## Product
 
-<run `/init` to fill in: what this product is and does>
+<team lead: run `/init` to fill in what this product is and does>
 
 ## Build
 
@@ -27,10 +27,10 @@
 
 ## Workspace & Dependencies
 
-<run `/init` to fill in: locally checked-out dependency repos, each marked
-**editable** (we own it — may be changed as part of work here, following its own
-AGENTS.md) or **read-only reference** (consult only; never edit; a needed change
-there is an external dependency to surface)>
+<team lead: run `/init` to fill in locally checked-out sibling repositories, each marked
+**modifiable** (we own it — may be changed as part of work here, following its
+own AGENTS.md) or **read-only** (consult only; never edit; a needed change there
+is an external dependency to surface)>
 
 ## Agent Rules
 

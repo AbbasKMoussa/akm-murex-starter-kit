@@ -1,16 +1,17 @@
 # restricted-path-guard.ps1 — preToolUse guard (PowerShell variant)
 #
-# LIVE-VERIFIED against GA Copilot CLI 1.0.68 on Windows (2026-07-06). The event
-# is { toolName, toolArgs, cwd, ... } where toolArgs is a JSON-ENCODED STRING
+# PAYLOAD SHAPE captured from GA Copilot CLI 1.0.68 on Windows (2026-07-06). The
+# event is { toolName, toolArgs, cwd, ... } where toolArgs is a JSON-ENCODED STRING
 # (e.g. "{\"path\":\"D:\\...\\.env\",...}"), not a nested object, and `path` is
 # ABSOLUTE. We decode toolArgs a second time and match on the repo-relative
-# path. Object-form toolArgs is still accepted (VS Code / dry-runs).
+# path. Object-form toolArgs is still accepted (VS Code / dry-runs). Logic passes
+# captured-payload tests; live post-fix denial is pending.
 #
 # Two rules, in order:
 #   1. Workspace boundary — edits resolving OUTSIDE the repository root are
 #      denied unless under a path declared in .agentic/hooks/editable-paths.txt.
 #   2. Restricted globs — edits matching .agentic/hooks/restricted-paths.txt are
-#      denied, in-repo and inside editable satellites alike.
+#      denied, in-repo and inside modifiable sibling repositories alike.
 #
 # SAFETY: always exit 0; default to allow on any parsing uncertainty; deny only
 # on a positive match (a restricted glob, or a path positively outside the
@@ -33,7 +34,7 @@ function Normalize([string]$p) {
   return [System.IO.Path]::GetFullPath($p).TrimEnd([System.IO.Path]::DirectorySeparatorChar)
 }
 
-# Deny if $rel (forward-slash path relative to its repo/satellite root) matches
+# Deny if $rel (forward-slash path relative to its repository root) matches
 # a restricted glob: full-path match, basename match, directory-prefix match.
 function Test-RestrictedGlobs([string]$rel) {
   $globsFile = '.agentic/hooks/restricted-paths.txt'
@@ -90,8 +91,8 @@ try {
     Allow
   }
 
-  # Outside the repository: allowed only under a declared editable dependency,
-  # with the restricted globs still applied inside it.
+  # Outside the repository: allowed only under a declared modifiable sibling
+  # repository, with the restricted globs still applied inside it.
   $editsFile = '.agentic/hooks/editable-paths.txt'
   if (Test-Path $editsFile) {
     foreach ($entry in Get-Content $editsFile) {
@@ -106,7 +107,7 @@ try {
     }
   }
 
-  Deny "Edit to '$path' is blocked: it resolves outside this repository and is not under a declared editable dependency. Owned sibling repos belong in .agentic/hooks/editable-paths.txt; read-only reference repos must not be edited."
+  Deny "Edit to '$path' is blocked: it resolves outside this repository and is not under a declared modifiable sibling repository. Modifiable sibling paths belong in .agentic/hooks/editable-paths.txt; read-only sibling repositories must not be edited."
 } catch {
   Allow
 }

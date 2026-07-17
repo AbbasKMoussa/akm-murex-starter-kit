@@ -5,13 +5,14 @@
 > result, and record PASS/FAIL. At the end, write a results table to
 > `windows-test-results.md` at the repo root and summarize what passed, what
 > failed, and any surprises. Do not "fix" failures unless asked — your job here is
-> to *observe and report*. These checks target two things that have never run on
-> Windows: the **PowerShell hook scripts** and the **Windows installer path**.
+> to *observe and report*. These checks provide a focused Windows regression pass
+> for the **PowerShell hook scripts** and the **Windows installer path**.
 
 AKMaestro is a kit that sets a repo up for agentic coding (Stage 1) and drives
 features (Stage 2). Hooks are guard scripts Copilot runs around tool calls; each
 guard reads a JSON event on **stdin** and prints a JSON decision on **stdout**.
-The PowerShell variants (`*.ps1`) are unverified — that's the point of this run.
+The PowerShell variants (`*.ps1`) and Windows installer have passed an initial
+live run. Repeat this prompt to detect regressions, especially in hook payloads.
 
 ---
 
@@ -35,7 +36,9 @@ Goal: confirm `akmaestro init` works on Windows and lays files down correctly.
 - `.github\hooks\scripts\` contains the four `*.ps1` files.
 - `.agentic\hooks\` contains `restricted-paths.txt`, `dangerous-commands.txt`,
   `editable-paths.txt`, `lint-commands.json`.
-- `.gitignore` exists and contains `.agentic/audit/`.
+- `.agentic\bin\akmaestro-state.py`, `.agentic\STATE-PROTOCOL.md`, and six
+  `.agentic\schemas\*.json` files exist.
+- `.gitignore` contains `.agentic/local/` and `.agentic/audit/`.
 - `AGENTS.md` was created (placeholder).
 
 Record the skill count and whether each expected path exists.
@@ -137,6 +140,10 @@ Skip if GitHub Copilot (VS Code or CLI) isn't installed here; note it as skipped
 4. If hooks are enabled on this surface, try an edit to `.env` and to a normal
    file, and note whether the **restricted-path guard** actually fires (deny vs
    allow) in a real session — this verifies the live tool-name/`toolArgs` wiring.
+5. After the team lead completes `/init`, open a fresh developer session and run
+   `/feature` directly. Confirm it never asks the developer to rerun `/init`, and
+   that any missing local requirement is offered as a confirmed structured
+   remediation action.
 
 Report: which skills were discoverable, what `/doctor` said, and whether hooks
 fired live (and on which surface: VS Code or CLI).

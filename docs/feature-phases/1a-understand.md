@@ -16,8 +16,9 @@ ambiguities, and the open questions — agreed with the user. No solution yet.
 
 Invoked via `/feature` or directly as `/feature-understand`, in a fresh context.
 If starting a new feature, ask for a short **title** (and optional ticket id),
-derive `feature-id`, and create `.agentic/features/<feature-id>/`. If resuming,
-read `state.json`.
+derive `feature-id`, and use controller `feature-create`. If resuming, use
+`feature-list`/`feature-show`, require `understanding`, and note the revision.
+Every entry checks committed initialization and local readiness first.
 
 ## Sources
 
@@ -83,16 +84,17 @@ Present `understanding.md` and iterate until the user confirms it reflects reali
 and the open questions are either answered or explicitly deferred. Nothing
 proceeds to framing without this. On approval:
 
-- record `phase: "understood"` and the approval in `state.json`;
+- write `understanding.md`, then call controller gate `understand` with the
+  expected revision (which moves the phase to `framing`);
 - tell the user: **open a new session and run `/feature-frame`**.
 
 ## State
 
-`state.json`: `featureId`, `title`, `phase` (`understanding` → `understood`),
-`lastApprovedGate: "understand"`, `nextCommand: "/feature-frame"`.
+Controller-owned `state.json`: phase `understanding` -> `framing`, approved
+`understand` gate, revision/history. `/feature-frame` is derived, not stored.
 
 ## Completion criteria
 
 Complete when `understanding.md` exists with problem, current behavior, affected
 areas, edge cases/ambiguities, open questions, and sources consulted; the user has
-confirmed it; and `state.json` records the approval and next command.
+confirmed it; and the controller records the approved gate.

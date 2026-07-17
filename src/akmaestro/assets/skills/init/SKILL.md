@@ -1,98 +1,96 @@
 ---
 name: init
 description: >-
-  Guided, resumable setup that makes this repository ready for agentic coding.
-  Use when the user says "let's run the initialization flow", "/init", "set up
-  this repo for agentic coding", "init status", or "init help". Orchestrates the
-  four setup topics (instructions, tooling, skills, hooks) by delegating to the
-  setup-* skills, persists progress, and writes a team guide on completion.
+  One-time, team-lead-owned repository initialization for agentic coding. Use
+  when the user says "let's run the initialization flow", "/init", "set up this
+  repo for agentic coding", "init status", or "init help". Orchestrates the
+  four setup topics, persists shared repository state, and writes the team guide.
 allowed-tools:
   - shell
 ---
 
-# init — guided agentic setup (orchestrator)
+# init - repository initialization orchestrator
 
-Run the one-time Stage 1 setup. Mandatory topics: instructions, tooling, skills.
-Optional: hooks. The flow is **resumable** and **non-destructive** — never
-overwrite existing files without confirmation; create new files freely.
+Run Stage 1 once for the repository. The **team lead** owns this flow and commits
+its output. Other developers pull that committed initialization and start with
+`/feature`; they do not rerun `/init` for their workstation.
 
-## Sub-commands
+Mandatory topics: instructions, tooling, and skills. Hooks are optional.
+Mandatory topics may finish `blocked` only for a recorded environment or policy
+reason. Existing files remain non-destructive: show and confirm every merge or
+replacement; create absent files directly.
 
-- `init status` — print the unified status (below) and stop.
-- `init help` — explain the flow and the `/setup-*` commands and stop.
-- otherwise — run/continue the guided flow.
+## Controller
 
-## State
+Read `.agentic/STATE-PROTOCOL.md`, then use only:
 
-Single source of truth: `.agentic/setup/initialization-state.json`:
-
-```json
-{
-  "version": 1,
-  "profile": { "mandatory": ["instructions","tooling","skills"], "optional": ["hooks"] },
-  "topics": {
-    "instructions": {"status":"pending"}, "tooling": {"status":"pending"},
-    "skills": {"status":"pending"}, "hooks": {"status":"pending","optional":true}
-  },
-  "currentStep": "instructions",
-  "overall": "incomplete"
-}
+```text
+uv run --no-project python .agentic/bin/akmaestro-state.py <command>
 ```
 
-Topic status is one of `pending | partial | complete | blocked`. `blocked` means
-a genuine environment/policy reason (recorded), and does **not** stop overall
-completion for the mandatory topics.
+Never edit `.agentic/setup/initialization-state.json` directly. Its version,
+revision, completion, next topic, and legal transitions are controller-owned.
+
+## Subcommands
+
+- `init status`: run `setup-status`, present the four topics, blocker reasons,
+  derived overall result, and next command; then stop.
+- `init help`: explain the one-time lead-owned flow and `/setup-*` topics; stop.
+- Otherwise: initialize or resume the repository flow.
+
+If `setup-status` already reports `complete`, do not restart setup. Explain that
+the repository is initialized, recommend `/doctor` for local health, and direct
+feature work to `/feature`.
 
 ## Procedure
 
-1. **Load or create state.** Read `initialization-state.json`; create it with the
-   profile above if absent.
-2. **Handle sub-commands.** If invoked as `status` or `help`, do that and stop.
-3. **Preflight (read-only).** Ensure `.agentic/setup/detected-repo.json` exists
-   and is fresh; if not, detect and write: languages/frameworks, package
-   managers, build/test/run/verify commands, CI, monorepo shape, candidate
-   complex modules, existing customization files (`AGENTS.md`,
-   `.github/copilot-instructions.md`, `.github/instructions/`, nested
-   `AGENTS.md`, `.github/skills/`, `.github/hooks/`), and git state. These
-   pre-fill the interviews so the user mostly confirms.
-4. **Run topics in order**, resuming from `currentStep`. For each, run the
-   matching skill and then refresh this state from its topic state file:
-   - instructions → run `setup-instructions`
-   - tooling → run `setup-tooling`
-   - skills → run `setup-skills`
-   - hooks (optional) → run `setup-hooks` (offer; user may decline)
-   Pause for input as needed; the flow may span sessions. After installs that add
-   skills/hooks/tools, ask the user to open a **new Copilot session**.
-5. **Completion.** When `instructions`, `tooling`, and `skills` are each
-   `complete` or `blocked` (with reason), set `overall = "complete"`, then:
-   - **Generate/update `.github/AGENTIC.md`** — the committed team guide: list the
-     installed skills and how to invoke them (`/teach`, `/doctor`, `/init`, …),
-     which hooks are active, where instruction files live, and the run/verify
-     commands. Regenerate it on every completed run.
-   - Print the handoff.
+1. Run `setup-init`. If an incompatible pre-release state file exists, stop and
+   ask before archiving/removing it; there is no migration because state v1 was
+   never shipped.
+2. Run `setup-status` and note its revision and derived next topic.
+3. Refresh committed `.agentic/setup/detected-repo.json` with **stable repository
+   facts only**: languages/frameworks, package managers, build/test/lint/run
+   commands, CI, monorepo shape, complex modules, instruction/skill/hook files,
+   and declared sibling repositories. Put branch, dirty status, PATH/tool
+   availability, and other workstation facts under `.agentic/local/`, never in
+   committed detection state.
+4. Run topics in controller order. Before delegation, transition the topic from
+   `pending`, `complete`, `blocked`, or `skipped` to `in_progress` using the
+   revision just read. Delegate to the matching skill:
+   - `instructions` -> `/setup-instructions`
+   - `tooling` -> `/setup-tooling`
+   - `skills` -> `/setup-skills`
+   - `hooks` -> `/setup-hooks`, or transition it to `skipped` if declined
+5. Each topic writes its evidence first and makes the terminal controller
+   transition last. After it returns, rerun `setup-status`; never calculate or
+   write the next topic yourself.
+6. When the derived overall result is `complete`, generate or update
+   `.github/AGENTIC.md` with installed skills, invocation examples, active hooks,
+   instruction locations, required developer tools, local-readiness behavior,
+   and run/verify commands. Confirm before merging an existing customized file.
+7. Run controller `validate`. Resolve errors; report warnings explicitly.
+8. Print the handoff and remind the lead to review and commit all shared setup
+   assets. Do not commit automatically.
 
-## Unified status (for `init status`)
-
-Aggregate the topic state files into one report; mark hooks optional; give the
-single most important next step. Example:
+## Status example
 
 ```text
-Setup status (mandatory: instructions, tooling, skills | optional: hooks)
-Instruction files: complete
-Tooling:           partial  (LSP ok; Graphifyy graph not generated)
-Skills:            complete
-Hooks:             optional — not installed
-Overall: incomplete (tooling pending)
-Next: finish Graphifyy in /setup-tooling
+Repository initialization
+Instructions  complete
+Tooling       blocked   Graphifyy registry denied by organization policy
+Skills        complete
+Hooks         skipped   optional
+Overall       complete
+
+Local workstation readiness is separate; /feature checks it for every developer.
 ```
 
-(`doctor` is the deeper active health check; `init status` reports progress from
-state.)
-
-## Handoff (on completion)
+## Handoff
 
 ```text
-Setup complete. Mandatory topics verified; hooks optional/installed.
-Team guide written to .github/AGENTIC.md.
-Next: start the feature flow with /feature (Stage 2).
+Repository initialization complete. Mandatory topics are verified or have
+documented blockers. Review and commit the shared AKMaestro files.
+
+Developers: pull the commit and run /feature. Do not rerun /init; /feature checks
+your local tools and offers confirmed remediation when required.
 ```

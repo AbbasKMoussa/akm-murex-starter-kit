@@ -6,18 +6,17 @@
 #   e.g. "{\"path\":\"/abs/path/.env\",...}", NOT a nested object, and `path`
 #   is ABSOLUTE. We therefore parse toolArgs a second time (fromjson) and match
 #   on the repo-relative path. Object-form toolArgs is still accepted (VS Code /
-#   dry-runs). STATUS: the PowerShell twin is live-verified on the Windows CLI;
-#   this bash variant is fixed by analogy and confirmed against the captured
-#   payload + CI, pending a live bash-surface (macOS/Linux CLI) re-confirmation.
+#   dry-runs). STATUS: both variants pass captured-payload tests; live post-fix
+#   denial remains pending, including a Bash-surface (macOS/Linux CLI) run.
 #
 # Two rules, in order:
 #   1. Workspace boundary — create/edit resolving OUTSIDE the repository root is
 #      denied unless the target is under a path declared in
-#      .agentic/hooks/editable-paths.txt (owned sibling repos, "editable
-#      satellites"). Read-only reference repos must not be listed there.
+#      .agentic/hooks/editable-paths.txt (the compatibility file for modifiable
+#      sibling repositories). Read-only sibling repositories must not be listed.
 #   2. Restricted globs — create/edit matching a glob in
 #      .agentic/hooks/restricted-paths.txt is denied. Applied to in-repo paths
-#      AND inside editable satellites (so .env, *.pem etc. stay protected there).
+#      AND inside modifiable siblings (so .env, *.pem etc. stay protected there).
 #
 # SAFETY: preToolUse command hooks are fail-closed (a non-zero exit denies ALL
 # tool calls). Therefore this script ALWAYS exits 0 and defaults to "allow" on
@@ -65,7 +64,7 @@ normalize() {
   printf '%s' "${out:-/}"
 }
 
-# Deny if $1 (a path relative to its repo/satellite root) matches a restricted
+# Deny if $1 (a path relative to its repository root) matches a restricted
 # glob: shell-pattern on the full relative path, on the basename, and as a
 # directory-prefix (a trailing /** means "anything under this directory").
 check_restricted_globs() {
@@ -96,15 +95,15 @@ if [ "$abs" = "$root" ] || [[ "$abs" == "$root"/* ]]; then
   allow
 fi
 
-# Outside the repository: allowed only under a declared editable dependency,
-# and the restricted globs still apply inside it.
+# Outside the repository: allowed only under a declared modifiable sibling
+# repository, and the restricted globs still apply inside it.
 edits_file=".agentic/hooks/editable-paths.txt"
 if [ -f "$edits_file" ]; then
   while IFS= read -r entry || [ -n "$entry" ]; do
     case "$entry" in ''|\#*) continue;; esac
     entry="${entry%$'\r'}"
     base="$(normalize "$entry")"
-    [ "$base" = "/" ] && continue   # never treat the filesystem root as editable
+    [ "$base" = "/" ] && continue   # never treat the filesystem root as modifiable
     if [ "$abs" = "$base" ] || [[ "$abs" == "$base"/* ]]; then
       rel="${abs#"$base"/}"
       check_restricted_globs "$rel"
@@ -113,4 +112,4 @@ if [ -f "$edits_file" ]; then
   done < "$edits_file"
 fi
 
-deny "Edit to '$path' is blocked: it resolves outside this repository and is not under a declared editable dependency. Owned sibling repos belong in .agentic/hooks/editable-paths.txt; read-only reference repos must not be edited."
+deny "Edit to '$path' is blocked: it resolves outside this repository and is not under a declared modifiable sibling repository. Modifiable sibling paths belong in .agentic/hooks/editable-paths.txt; read-only sibling repositories must not be edited."

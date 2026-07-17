@@ -1,42 +1,48 @@
 ---
 name: setup-skills
 description: >-
-  Install the kit's agent skills into this repository's .github/skills/ and
-  verify they are valid and discoverable. Use for "/setup-skills", "install the
-  skills", or the skills step of /init.
+  Verify the complete agent-skill set bootstrapped into this repository's
+  .github/skills/. Use for "/setup-skills", "check the installed skills", or the
+  skills step of /init.
 allowed-tools:
   - shell
 ---
 
-# setup-skills — install agent skills
+# setup-skills — verify agent skills
 
-Install the curated skills into `.github/skills/` so the team gets reusable
-workflows, invokable as `/<name>` on every Copilot surface.
+The CLI bootstrap installs all 18 bundled skills into `.github/skills/` before
+this flow starts. Verify that complete set so both `/init` and `/feature` are
+available on every Copilot surface.
 
-## Verify kit flow-skills
+## State protocol
 
-Confirm the flow-skills and helpers are present and valid:
-`init`, `setup-instructions`, `setup-tooling`, `setup-skills`, `setup-hooks`,
-`doctor`. Missing/invalid → report and re-run the installer.
+Read `.agentic/STATE-PROTOCOL.md`. Run `setup-init` and `setup-status` through
+the bundled controller. If this topic is not already `in_progress`, transition
+`skills` to `in_progress` with the revision just read. Never edit aggregate
+setup state directly.
 
-## Catalog
+## Required bundled set
 
-Present the catalog with one line each and let the user accept the recommended
-set or pick a subset. Current catalog:
+Confirm all bundled skills are present and valid:
 
-- `teach` — routes and refines agent instructions: decides where a lesson belongs
-  (root `AGENTS.md`, a module `AGENTS.md`, a path-scoped instructions file, or
-  personal user-level config) and refines the wording before adding it.
+- Stage 1: `init`, `setup-instructions`, `setup-tooling`, `setup-skills`,
+  `setup-hooks`, `teach`, `doctor`.
+- Stage 2: `feature`, `feature-understand`, `feature-frame`, `feature-split`,
+  `story-prime`, `story-plan`, `story-implement`, `story-review`, `story-learn`,
+  `feature-review`, `feature-retro`.
 
-(Feature-implementation skills are added later by Stage 2, not here.)
+Missing bundled skill → report it and recommend `akmaestro update` (or
+`akmaestro init` for a fresh bootstrap). A same-named customized skill is never
+overwritten without confirmation.
 
-## Install
+## Additional team skills
 
-For each selected skill, ensure `.github/skills/<name>/` exists with its
-`SKILL.md` and bundled files (the installer copies them; this step verifies and,
-if missing, restores from the kit). If a skill of the same name already exists
-and the user customized it, do **not** overwrite — show the difference and let
-the user decide.
+Preserve and validate any non-bundled skills already present. They are
+team-owned; do not overwrite or remove them. Report an invalid additional skill
+as a warning, but do not let it block the required bundled set.
+
+There is no separate optional catalog. The full AKMaestro capability set is part
+of the bootstrap by design.
 
 ## Validate
 
@@ -47,18 +53,29 @@ a newly added skill is only visible in a **new** session.
 
 ## New session
 
-After adding skills, ask the user to open a new Copilot session so `/<name>`
-invocation is available, then confirm with `init status` or `init help`.
+If the bootstrap or an update added skills during the current session, ask the
+user to open a new Copilot session so `/<name>` invocation is available. Then
+confirm with `init status`, `init help`, or the surface's skill list.
 
 ## State
 
-`.agentic/setup/skills-state.json`: catalog version; selected skills + installed
-paths; per-skill validation (frontmatter, resources); kit flow-skills present;
-new-session requested; overall status.
+Create local JSON evidence containing the kit version, all 18 bundled skill
+paths, additional team skills, per-skill validation, and new-session result.
+Write it atomically with `evidence-write skills`; this produces committed
+`.agentic/setup/skills-state.json` without a duplicate topic status.
 
 ## Completion
 
-Complete when the kit flow-skills are present/valid, every selected catalog skill
-is installed with valid `SKILL.md` and intact resources, nothing was overwritten
+Complete when all 18 bundled skills are present with valid `SKILL.md` files and
+intact resources, additional team skills were preserved, nothing was overwritten
 without confirmation, a new session was requested if skills were added in an
 existing session, and state records the results.
+
+A missing or invalid bundled skill leaves this topic `in_progress`. Use
+`blocked` only when a real environment or policy constraint prevents repair and
+the manual steps are recorded.
+
+Write evidence first. Then transition `skills` from `in_progress` to `complete`,
+or to `blocked --reason <reason>` for a genuine blocker, using the latest
+aggregate `--expected-revision`. Rerun `setup-status` and report its derived next
+command.

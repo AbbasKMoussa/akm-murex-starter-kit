@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # audit-log.sh — observational hook (userPromptSubmitted / postToolUse / sessionEnd)
 #
-# STATUS: DRAFT. Appends one JSON line per event to a local, gitignored trail.
+# STATUS: event inference is regression-tested against captured CLI payloads;
+# live Bash-surface verification remains pending.
 #
 # Never blocks and never influences the agent: emits no decision and ALWAYS
 # exits 0, even on error.

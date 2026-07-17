@@ -16,6 +16,13 @@ preview, cloud agent). They are **optional**: install the recommended set by
 default, let the user decline per hook or entirely, and degrade gracefully where
 org policy disables them. Hooks never block overall setup completion.
 
+## State protocol
+
+Read `.agentic/STATE-PROTOCOL.md`. Run `setup-init` and `setup-status` through
+the bundled controller. If the user declines hooks entirely, transition `hooks`
+directly to `skipped` and stop. Otherwise ensure the topic is `in_progress` with
+the revision just read. Never edit aggregate setup state directly.
+
 ## Recommended set
 
 | Hook | Event | Behavior |
@@ -32,11 +39,12 @@ seed data in `.agentic/hooks/`. This step:
 
 - confirms the files are present and the `.sh` scripts are executable;
 - **seeds repo-specific data**: add the restricted areas from `AGENTS.md` to
-  `.agentic/hooks/restricted-paths.txt`; add each **editable** dependency from
-  the Workspace & Dependencies section to `.agentic/hooks/editable-paths.txt`
-  (the boundary rule: edits outside the repo are denied unless under a listed
-  path — read-only deps are never listed); add detected lint commands (per
-  extension, `{file}` placeholder) to `.agentic/hooks/lint-commands.json`;
+  `.agentic/hooks/restricted-paths.txt`; add each **modifiable sibling
+  repository** from the Workspace & Dependencies section to the compatibility
+  file `.agentic/hooks/editable-paths.txt` (the boundary rule: edits outside the
+  repo are denied unless under a listed path; read-only sibling repositories are
+  never listed); add detected lint commands (per extension, `{file}` placeholder)
+  to `.agentic/hooks/lint-commands.json`;
 - never overwrites an existing hook config or a script the user customized —
   merge handler arrays per event; show changes and confirm.
 
@@ -56,7 +64,7 @@ a positive match. Do not "harden" them into failing closed on error.
   - `printf '%s' '{"toolName":"edit","toolArgs":"{\"path\":\".env\"}"}' | bash .github/hooks/scripts/restricted-path-guard.sh` → deny
   - same with inner `"path":"README.md"` → allow
   - same with inner `"path":"../not-a-declared-dep/x.txt"` → deny (workspace boundary)
-  - if an editable dep is declared, inner path under it → allow
+  - if a modifiable sibling repository is declared, inner path under it → allow
   - `printf '%s' '{"toolName":"powershell","toolArgs":"{\"command\":\"rm -rf /\"}"}' | bash .github/hooks/scripts/dangerous-command-guard.sh` → deny
   - same with inner `"command":"ls -la"` → allow
 
@@ -70,12 +78,18 @@ guard's deny path (e.g. attempt an edit to a restricted path) to confirm.
 
 ## State
 
-`.agentic/setup/hooks-state.json`: installed vs declined hooks; config-data paths
-+ whether populated; per-hook validation (schema, scripts, allow+deny fired);
-surface(s) verified; whether policy disabled hooks; new-session requested; status.
+Create local JSON evidence containing installed/declined hooks, config paths,
+per-hook validation, verified surfaces, policy restrictions, and new-session
+result. Write it with `evidence-write hooks`; this produces committed
+`.agentic/setup/hooks-state.json` without a duplicate topic status.
 
 ## Completion
 
 Hooks are optional, so they never block setup. The topic is "done" when the
 chosen hooks are installed, valid, and their guards fired both allow and deny on
 at least the GA CLI; or recorded as `blocked` if policy disables them.
+
+Write evidence first. Then transition `hooks` from `in_progress` to `complete`,
+or to `blocked --reason <reason>` when policy prevents validation, passing the
+latest aggregate `--expected-revision`. Rerun `setup-status` and report its
+derived next command.

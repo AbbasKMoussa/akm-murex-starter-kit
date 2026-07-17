@@ -17,8 +17,12 @@ whole and how a human verifies it. Always gated/HITL (modes apply only to Phase 
 
 ## Entry
 
-Fresh context. Read `state.json`, `feature.md`, `understanding.md`, and all story
-files. If any story isn't `done`, point back to the per-story loop.
+Fresh context. Read `.agentic/STATE-PROTOCOL.md`; run `setup-status` and
+`readiness-check`, offering confirmed local remediation when required. Resolve
+the feature with `feature-list` and `feature-show`, require phase `reviewing`,
+and note the revision. Then read `feature.md`, `understanding.md`, and all story
+artifacts. The controller already guarantees every story step is `complete`.
+Never edit `state.json` directly.
 
 ## Review (high level)
 
@@ -29,12 +33,12 @@ files. If any story isn't `done`, point back to the per-story loop.
   handled end-to-end.
 - **Tests & build** — run the feature's tests and the build; green? Record
   `blocked` + reason if the environment can't.
-- **Cross-repo integration** — if stories touched an editable dependency: its own
-  tests/build pass, its changes are committed there (referencing the feature id),
-  and this repo consumes them through the declared mechanism (link/version/
-  rebuild) — not through uncommitted local state. No read-only dependency was
-  modified; any external dependencies recorded in `feature.md` are resolved or
-  explicitly still open.
+- **Cross-repo integration** — if stories touched a modifiable sibling
+  repository: its own tests/build pass, its changes are committed there
+  (referencing the feature id), and this repo consumes them through the declared
+  mechanism (link/version/rebuild) — not through uncommitted local state. No
+  read-only sibling repository was modified; any external dependencies recorded
+  in `feature.md` are resolved or explicitly still open.
 - **Conventions & safety** — consistent with `AGENTS.md`; no scope creep beyond the
   feature; no restricted-area changes.
 
@@ -70,13 +74,18 @@ and the expected result for each.
 ## Gate (hard stop)
 
 Present `review.md`. If issues block the feature, reopen the relevant story's loop.
-On approval: set `phase: "reviewed"`, `lastApprovedGate: "feature-review"`,
-`nextCommand: "/feature-retro"`; tell the user to open a new session and run
-**`/feature-retro`** — or, if this session is still light (short history, few
-files read), offer to continue with `/feature-retro` right here.
+Write the findings first, then call `story-transition --feature <feature-id>
+--story <story-id> --to plan|implement --expected-revision <revision>`. The
+controller reopens `story_loop` and records the review attempt.
+
+On approval, write `review.md` first, then call `feature-advance --id
+<feature-id> --gate feature-review --expected-revision <revision>`. Report the
+derived `/feature-retro` command and offer the normal fresh-session or
+light-context continuation.
 
 ## Completion
 
 `review.md` exists with an AC verdict, integration findings, a tests/build result,
 and a manual-testing guide; blocking issues resolved or explicitly deferred; the
-user approved; state records approval and next command.
+user approved; state records the approved gate. Stale state is reread and
+reconciled rather than overwritten.

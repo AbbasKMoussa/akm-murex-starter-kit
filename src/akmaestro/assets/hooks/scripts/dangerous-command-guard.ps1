@@ -1,9 +1,9 @@
 # dangerous-command-guard.ps1 — preToolUse guard (PowerShell variant)
 #
-# LIVE-VERIFIED against GA Copilot CLI 1.0.68 on Windows (2026-07-06). toolArgs
-# arrives as a JSON-ENCODED STRING (e.g. "{\"command\":\"...\"}"), not a nested
-# object, so we decode it a second time before reading `command`. Object-form is
-# still accepted.
+# PAYLOAD SHAPE captured from GA Copilot CLI 1.0.68 on Windows (2026-07-06).
+# toolArgs arrives as a JSON-ENCODED STRING (e.g. "{\"command\":\"...\"}"), not
+# a nested object, so we decode it before reading `command`. Object-form is still
+# accepted. Logic passes captured-payload tests; live post-fix denial is pending.
 #
 # SAFETY: always exit 0; default allow; deny only on a positive regex match
 # against .agentic/hooks/dangerous-commands.txt. Patterns are written to be

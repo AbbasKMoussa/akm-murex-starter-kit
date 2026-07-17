@@ -8,13 +8,14 @@
 > captured audit-payload samples, and a summary. **Observe and report — do not
 > fix failures**, and stay inside this scratch repository at all times.
 
-AKMaestro sets a repo up for agentic coding (Stage 1: `/init`) and drives
-features through gated phases (Stage 2: `/feature`). It was installed into this
+AKMaestro lets a team lead initialize a repo once (`/init`), then lets every
+developer start directly with `/feature`. `/feature` checks developer-local
+readiness and offers confirmed remediation. The kit was installed into this
 scratch repo with `akmaestro init`. Its guard hooks read a JSON event on stdin
-and print a decision on stdout — but the tool names and payload field names they
-match on (`toolName`/`tool_name`, `toolArgs.path`, …) are **defensive guesses
-that have never been checked against a real Copilot session**. Capturing the
-real values is the single most valuable output of this run.
+and print a decision on stdout. Copilot CLI 1.0.68 on Windows sent `toolArgs` as
+a JSON-encoded string; the scripts now decode that shape and retain defensive
+fallbacks. This run must confirm the fixed deny paths fire live and capture the
+payload again in case the surface contract moved.
 
 Record up front: OS, Copilot surface (VS Code or CLI) and its version, and
 whether `jq` is on PATH (`jq --version`).
@@ -29,7 +30,10 @@ whether `jq` is on PATH (`jq --version`).
 3. `.agentic/hooks/` has `restricted-paths.txt`, `dangerous-commands.txt`,
    `editable-paths.txt`, `lint-commands.json`; `.agentic/setup/kit-manifest.json`
    exists.
-4. `AGENTS.md` exists (placeholder) and `.gitignore` contains `.agentic/audit/`.
+4. `.agentic/bin/akmaestro-state.py`, `.agentic/STATE-PROTOCOL.md`, and six
+   schemas exist.
+5. `AGENTS.md` exists (placeholder) and `.gitignore` contains both
+   `.agentic/local/` and `.agentic/audit/`.
 
 **Expected:** all present. Record the actual skill count.
 
@@ -41,8 +45,8 @@ In *this* session, check which kit skills are discoverable/invocable: `init`,
 `story-prime`, `story-plan`, `story-implement`, `story-review`, `story-learn`,
 `feature-review`, `feature-retro`.
 
-5. Are they visible as slash commands (or listed as available skills)?
-6. Does plain natural language route correctly — say nothing but
+6. Are they visible as slash commands (or listed as available skills)?
+7. Does plain natural language route correctly — say nothing but
    *"is the agentic setup healthy?"* and see whether the **doctor** skill is
    picked up.
 
@@ -51,11 +55,11 @@ missing names and how discovery presents them on this surface.
 
 ## Phase 2 — /doctor
 
-7. Run `/doctor` and capture its report verbatim.
+8. Run `/doctor` and capture its report verbatim.
 
 **Expected:** a grouped ok/warn/fail report that reaches a verdict without
-crashing. Warns are fine (e.g. Graphifyy not installed); note anything that
-looks wrong, especially in the Hooks section.
+crashing. Before `/init`, missing initialization/environment requirements are
+expected failures; note anything else that looks wrong.
 
 ## Phase 3 — Live hooks (the main event)
 
@@ -67,18 +71,18 @@ looks wrong, especially in the Hooks section.
 
 First ask the human whether hooks are enabled on this surface (VS Code agent
 hooks are preview and may be disabled by org policy; the CLI has them GA). If
-they cannot be enabled, mark 8–13 SKIPPED with the reason and go to Phase 4.
+they cannot be enabled, mark the hook checks SKIPPED with the reason and continue.
 
 > Safety by design: every probe below is harmless even if **no** hook fires.
 > Do not use real destructive commands to test the guard.
 
-8. **Restricted path — deny.** Try to create/edit `.env` in this scratch repo
+9. **Restricted path — deny.** Try to create/edit `.env` in this scratch repo
    (any content). **Expected:** the edit is blocked and the deny reason mentions
    the restricted-path guard. (If no hook fires, a `.env` appears in a scratch
    repo — harmless; record FAIL.)
-9. **Restricted path — allow.** Create `notes.md` with one line.
+10. **Restricted path — allow.** Create `notes.md` with one line.
    **Expected:** succeeds, no interference.
-10. **Dangerous command — deny, via a benign sentinel.** Append this line to
+11. **Dangerous command — deny, via a benign sentinel.** Append this line to
     `.agentic/hooks/dangerous-commands.txt`:
     ```
     ^echo AKM_GUARD_TEST$
@@ -86,24 +90,24 @@ they cannot be enabled, mark 8–13 SKIPPED with the reason and go to Phase 4.
     Then run the shell command `echo AKM_GUARD_TEST`. **Expected:** blocked by
     the dangerous-command guard. (If no hook fires it just echoes — harmless;
     record FAIL.) Remove the sentinel line afterwards.
-11. **Workspace boundary — deny.** Try to create `../akm-boundary-probe/x.txt`
+12. **Workspace boundary — deny.** Try to create `../akm-boundary-probe/x.txt`
     (a sibling of this repo). **Expected:** blocked — the path resolves outside
-    the repository and no editable dependency is declared. (If no hook fires, a
-    stray sibling folder appears — delete it and record FAIL.)
-12. **Workspace boundary — editable satellite allow.** Create a sibling repo
+    the repository and no modifiable sibling repository is declared. (If no hook
+    fires, a stray sibling folder appears — delete it and record FAIL.)
+13. **Workspace boundary — modifiable sibling allow.** Create a sibling repo
     `../akm-lib-b/` (plain `mkdir`), append the line `../akm-lib-b` to
     `.agentic/hooks/editable-paths.txt`, then try to create
     `../akm-lib-b/mod.py`. **Expected:** allowed. Also try
     `../akm-lib-b/.env` — **Expected:** denied (restricted globs apply inside
-    satellites). Clean up `../akm-lib-b/` and the added line afterwards.
-13. **Lint hook silence.** After the `notes.md` edit, confirm nothing lint-ish
+    sibling repositories). Clean up `../akm-lib-b/` and the added line afterwards.
+14. **Lint hook silence.** After the `notes.md` edit, confirm nothing lint-ish
     was injected (no lint command is configured for `.md`). **Expected:** no-op.
 
 ## Phase 4 — Audit trail: capture the real payloads
 
-14. Check `.agentic/audit/` for a `<date>.jsonl` file. **Expected:** if hooks
+15. Check `.agentic/audit/` for a `<date>.jsonl` file. **Expected:** if hooks
     are enabled, it exists and grew during Phase 3.
-15. From the `.jsonl` lines, extract and report the **real payload shape** —
+16. From the `.jsonl` lines, extract and report the **real payload shape** —
     this is the data we need to validate the guards' field guesses:
     - the event names seen (`hook_event_name` / `hookEventName` values);
     - the tool names Copilot uses for file edits and shell commands;
@@ -117,41 +121,52 @@ they cannot be enabled, mark 8–13 SKIPPED with the reason and go to Phase 4.
 
 ## Phase 5 — /init end-to-end (interactive; the human answers)
 
-16. Run `/init` and walk the flow with the human. Record:
+17. Run `/init` **as the team lead** and walk the flow with the human. Record:
     - does it **chain** to `setup-instructions` → `setup-tooling` →
       `setup-skills` → `setup-hooks` by itself, or must each be invoked by hand?
     - does it write `.agentic/setup/initialization-state.json` and resume
       correctly if you stop and run `/init` again in a **new** session?
+    - is state version 2, with a revision, no persisted `overall`/`currentStep`,
+      and controller-derived status?
+    - does tooling write `.agentic/setup/environment-requirements.json` with
+      required `uv`, Graphifyy, selected `lsp-*`, and graph entries?
     - does `init status` report sensibly mid-flow?
     - on completion: is `AGENTS.md` filled in with real repo facts, and is
       `.github/AGENTIC.md` written?
 
 **Expected:** the flow drives itself, persists state, resumes, and completes
-with both files written. Time-box it; if a topic drags (e.g. Graphifyy install),
-let it be marked `blocked` and continue — that path is part of the design.
+with both files written. `.agentic/local/` remains ignored. Time-box it; a
+genuine setup blocker may be documented, but `/feature` will still require local
+readiness before mutation.
 
 ## Phase 6 — /teach
 
-17. Say: *"remember that in this repo, test files always end in `_spec`"*.
+18. Say: *"remember that in this repo, test files always end in `_spec`"*.
     **Expected:** the teach skill gates/refines it, proposes root `AGENTS.md`
     (or a scoped instructions file), shows the exact text and placement, and
     asks before writing. Record where it landed.
 
 ## Phase 7 — Stage 2 mini-feature (optional, ~30+ min)
 
-18. In a fresh session run `/feature`, start a tiny toy feature (e.g. "add a
-    `hello` script with a test"). Record: does `/feature` create the state and
-    hand off to `/feature-understand`?
-19. Walk Understand → Frame → Split with the human. At each gate, record whether
+19. In a fresh **developer** session, skip `/init` and run `/feature`. Record:
+    does it verify the shared initialization, probe local readiness, and offer
+    missing remediation actions for confirmation? Decline one once and confirm
+    feature mutation remains blocked; then approve/remediate and rerun.
+20. Start a tiny toy feature. Confirm state is created without a shared
+    `index.json`, the selection is in `.agentic/local/active-feature.json`, and
+    the derived handoff is `/feature-understand`.
+21. Walk Understand → Frame → Split with the human. At each gate, record whether
     it offers to **continue in the same session while context is light** (it
     should) and whether artifacts (`understanding.md`, `feature.md`, story
     files) are written under `.agentic/features/<id>/`.
-20. Run one story in **guided** mode and, if a second story exists, one in
+22. Run one story in **guided** mode and, if a second story exists, one in
     **autonomous** mode. Record: does autonomous run Prime→…→Learn in one
     session without stopping? Does implement → review insist on a fresh session
     in guided mode (it must — no same-session offer there)?
-21. From a cold session, ask `/feature` *"where are we?"*. **Expected:** correct
-    phase/story/next command from disk state alone.
+23. From a cold session, ask `/feature` *"where are we?"*. **Expected:** correct
+    phase/story/next command derived from disk state. Interrupt once after an
+    artifact write and before transition; rerun and confirm the old state resumes
+    without corruption or duplicate advancement.
 
 ---
 

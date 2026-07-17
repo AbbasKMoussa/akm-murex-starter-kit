@@ -1,15 +1,15 @@
 # Stage 2: Feature Flow (master spec)
 
 A repeatable, per-feature flow — BMAD-style but leaner. It assumes Stage 1 is
-complete (the repo is set up for agentic coding) and reuses the same machinery:
-skills + `.agentic/` state, installed by the same `uvx akmaestro`
-installer.
+complete and committed by the team lead. It reuses the installed skills,
+schemas, and repo-local state controller.
 
-This is a draft to iterate on, not a final design.
+The flow is implemented as 11 bundled skills. This document remains the product
+specification for improving their behavior.
 
 ## Working model (BMAD-style)
 
-Three principles drive the whole flow:
+Four principles drive the whole flow:
 
 1. **Fresh context per step.** Each step runs in its own Copilot session. When a
    step finishes it does **not** roll straight into the next — it tells the user
@@ -54,8 +54,8 @@ For a given story, the loop runs in one of two modes:
   story in one shot. It still surfaces genuine blockers/hard decisions, and the
   hooks (guards/lint) still apply. Faster, less oversight.
 
-Mode is chosen when entering the loop (defaulting from a feature-level setting),
-can be set **per story**, and is switchable. `feature status` shows the current
+Mode is chosen before priming each story, defaults to guided, and can be set
+**per story** until Prime begins. `feature status` shows the current
 mode. The loop's *entry* and *exit* are still phase-level gates — autonomous only
 removes the *inside-the-loop* stops for that story; it does not auto-advance to
 the next story.
@@ -69,38 +69,40 @@ for the least complexity.
 
 The specialist is carried by the **skill** (decision: curated skills as
 specialists). Each step's `SKILL.md` embeds a named role persona — its identity,
-expertise, and what "good" looks like — plus bundled **templates and checklists**
-(the equivalent of BMAD's agent "dependencies"). Combined with fresh-context-per
--step, each step therefore runs as a focused specialist loaded only with its own
+expertise, and what "good" looks like — plus its templates and checklists (the
+equivalent of BMAD's agent "dependencies"). Combined with fresh context per
+step, each step therefore runs as a focused specialist loaded only with its own
 role and resources. This keeps the cross-surface uniformity of Stage 1 (skills
 work the same in VS Code + CLI) with no loss of quality: the quality comes from
 the curation and the clean context, not from any agent primitive.
 
 ## Prerequisite
 
-`/feature` first checks Stage 1 is complete (via `init status` / `doctor`). If
-instructions/tooling/skills are not ready, it points the user there before
-starting. The feature flow relies on the agent files, LSP, and Graphifyy that
-Stage 1 installs.
+`/feature` first checks the committed Stage 1 state. If repository initialization
+is incomplete, only the team lead resumes `/init`. It then runs the local
+readiness probes from committed environment requirements. Missing `uv`,
+Graphifyy, selected LSPs, or graphs block mutation; `/feature` presents the
+structured remediation action and asks before running it. Developers never run
+`/init` for workstation setup.
 
 ## Multi-repo workspaces
 
 The main repo is always the **flow home**: state, artifacts, and every session
-live here, even when work spans repos. Dependencies checked out locally are
-declared in `AGENTS.md` (Workspace & Dependencies) with one of two roles:
+live here, even when work spans repos. Locally checked-out sibling repositories
+are declared in `AGENTS.md` (Workspace & Dependencies) with one of two roles:
 
-- **Editable satellite** — a repo the team owns; functionally part of the
-  application, just in its own git repo. Stories may change it as part of normal
-  work here: the Split phase tags each story with the repos it touches, the
-  dependency-side contract (interface + its tests, per that repo's own
-  `AGENTS.md`) is delivered before the consuming side, and satellite changes are
-  committed in the satellite referencing the feature id. The restricted-path
-  guard permits these paths via `.agentic/hooks/editable-paths.txt`.
-- **Read-only reference** — another team's code, consulted to understand
-  behavior: its Graphifyy graph for the high-level map, its code only when a
-  specific behavior matters. Findings there are fixed constraints. It is never
-  edited (the boundary guard denies it); a change needed there is recorded in
-  `feature.md` as an external dependency for the owning team, never a story.
+- **Modifiable sibling repository** — a repo the team owns; functionally part of
+  the application, just in its own git repo. Stories may change it as part of
+  normal work here: Split tags each story with the repos it touches, the
+  sibling-side contract (interface + its tests, per that repo's own `AGENTS.md`)
+  is delivered before the consuming side, and changes are committed in the
+  sibling repo referencing the feature id. The restricted-path guard permits
+  these paths via the compatibility file `.agentic/hooks/editable-paths.txt`.
+- **Read-only sibling repository** — another team's code, consulted to
+  understand behavior: use its Graphifyy graph for the high-level map and open
+  code only when a specific behavior matters. Findings there are fixed
+  constraints. It is never edited; a needed change is recorded in `feature.md`
+  as an external dependency for the owning team, never a story.
 
 ## Phases and skills
 
@@ -117,7 +119,7 @@ run in its own context), mirroring `/init` + `/setup-*`.
 | 4. Feature review | `/feature-review` | QA / Integration reviewer | `review.md`: high-level review + guided manual-testing steps. |
 | 5. Retrospective | `/feature-retro` | Retro facilitator | `retro.md` + AI-infra updates (via `/teach`). |
 
-Each skill bundles the templates/checklists its persona uses (e.g.
+Each skill embeds the templates/checklists its persona uses (e.g.
 `/feature-frame` ships a feature-doc template + an acceptance-criteria checklist;
 `/story-review` ships a review checklist). This roster is leaner than BMAD's —
 story-level review and feature-level review are distinct personas (a close-up
@@ -171,38 +173,57 @@ evolves.
 
 ```text
 .agentic/features/
-  index.json              # features in progress + which one is active (for /feature status)
   <feature-id>/
     understanding.md      # Phase 1a: problem, current behavior, edge cases, sources
     feature.md            # Phase 1b: solution approach + acceptance criteria
-    state.json            # current phase/step, story index, gate approvals, next command
+    state.json            # canonical phase, ordered story steps, gates, history
     stories/
-      01-<slug>.md        # description, acceptance, primer, plan, review notes, status
+      01-<slug>.md        # description, acceptance, primer, plan, review, learnings
       02-<slug>.md
     review.md             # Phase 4 output
     retro.md              # Phase 5 output
+
+.agentic/local/
+  active-feature.json     # this worktree's selected feature; gitignored
+  readiness.json          # this developer's requirement probes; gitignored
+  locks/                  # cross-platform mutation locks; gitignored
 ```
 
 `state.json` (shape):
 
 ```json
 {
-  "version": 1,
+  "$schema": "../../schemas/feature-state.schema.json",
+  "version": 2,
+  "revision": 8,
   "featureId": "<id>",
   "title": "…",
-  "phase": "story-loop",
+  "phase": "story_loop",
   "currentStory": "01-<slug>",
-  "currentStep": "story-plan",
-  "stories": { "01-<slug>": { "step": "review", "status": "in-progress" } },
-  "lastApprovedGate": "story-plan:01",
-  "nextCommand": "/story-implement"
+  "stories": [
+    { "id": "01-<slug>", "step": "implement", "mode": "guided", "reviewAttempts": 0 }
+  ],
+  "gates": [
+    { "name": "understand", "approvedAt": "…" },
+    { "name": "frame", "approvedAt": "…" },
+    { "name": "split", "approvedAt": "…" }
+  ],
+  "history": [],
+  "createdAt": "…",
+  "updatedAt": "…"
 }
 ```
 
-State is the single source of truth for resume and for `feature status`. Because
-each step runs in a fresh context, the step's first action is always to **read
-state + the relevant artifacts**, and its last action is to **write them and the
-next command**.
+The controller enforces phases `understanding -> framing -> splitting ->
+story_loop -> reviewing -> retrospective -> complete` and story steps `prime ->
+plan -> implement -> review -> learn -> complete`, including review send-backs.
+`nextCommand`, completion, and display status are derived rather than persisted.
+Story Markdown never duplicates status.
+
+Each step runs `feature-show`, notes the revision, writes its human artifact
+first, then makes the controller transition last with `--expected-revision`.
+Writes are atomic and serialized by local locks. Replays are idempotent; stale
+revisions force a reread instead of an overwrite.
 
 ## Status / help behavior
 
@@ -220,7 +241,7 @@ phrases like "where are we?", "what's the status?", "what's left?", "what should
 I do next?", "resume the feature" so Copilot routes those to it (same mechanism as
 `/teach`). The slash form is just the explicit path.
 
-`/feature status` reads the active feature's `state.json` and prints, e.g.:
+`/feature status` runs `feature-list` and `feature-show`, then prints, e.g.:
 
 ```text
 Feature: search-filters  (phase: story loop)
@@ -232,14 +253,14 @@ Next: open a new session and run /story-implement
 It handles every situation so the user is never stuck:
 
 - **No feature in progress** → say so and suggest `/feature-understand` to start.
-- **One feature in progress** → orient as above.
+- **One feature in progress** → orient as above and select it locally if needed.
 - **Multiple features in progress** → list them with their phase/next-step and ask
-  which to resume.
+  which to resume in this worktree.
 
-To support this, `.agentic/features/` keeps a small `index.json` (the features and
-which one is active); `/feature` updates the active pointer as you work. Every
-step skill also ends by printing the same "Next: …" line, so orientation is
-consistent whether you ask explicitly or just finish a step.
+Feature directories themselves are the shared registry. There is no mutable
+shared index. The selected feature is stored in gitignored
+`.agentic/local/active-feature.json`, so developers and worktrees do not conflict.
+Every step prints the controller-derived "Next" line.
 
 ## Completion
 
@@ -247,15 +268,16 @@ A feature is complete when every story has passed `/story-review` and been close
 by `/story-learn`, the feature review + manual-test guide (`review.md`) is done,
 and the retrospective (`retro.md`) is recorded. `/feature` then prints a summary.
 
-## Status of the design
+## Implementation status
 
 All five phases are now detailed (see Phase details above). Resolved along the
 way: feature-id scheme (1a), story sizing + ordering + dependencies (Phase 2,
 S10), what story/feature review checks (Phases 3–4), manual-testing-guide format
 (Phase 4), and primer location — appended to the story file (Phase 3).
 
-Stage 2 is **planned**. Remaining before it's real: build the skills
-(`/feature` + `feature-frame`/`understand`/`split`/`story-*`/`feature-review`/
-`feature-retro`) and their bundled templates/checklists, add them to the installer
-asset catalog, and wire the optional Jira/wiki PAT config — mirroring the Stage 1
-build.
+All 11 Stage 2 skills and the v2 controller/schemas are bundled by the installer.
+Automated tests cover legal/illegal transitions, stale revisions, idempotent
+replay, review loops, local readiness, and feature completion. The revised flow
+still needs end-to-end Copilot CLI and VS Code validation, including
+interruption/recovery, autonomous delegation, remediation, hooks, and the
+multi-repo boundary.
