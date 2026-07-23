@@ -46,8 +46,6 @@ function Canonicalize([string]$p) {
     $candidate = Join-Path $current $segment
     $item = Get-Item -LiteralPath $candidate -Force -ErrorAction SilentlyContinue
     if ($item -and $item.LinkType) {
-      $method = $item.GetType().GetMethod('ResolveLinkTarget', @([bool]))
-      if (-not $method) { throw "Link resolution unavailable" }
       $target = $item.ResolveLinkTarget($true)
       if (-not $target) { throw "Link target unavailable" }
       $current = $target.FullName

@@ -103,7 +103,7 @@ jobs:
               "/assets/hooks-data/lint-commands.json",
               "/assets/runtime/STATE-PROTOCOL.md",
               "/assets/skills/setup-instructions/references/instructions-evidence.example.json",
-              "/akmaestro/state.py",
+              "akmaestro/state.py",
           )
           for suffix in required:
               assert any(name.endswith(suffix) for name in names), f"missing {suffix}"

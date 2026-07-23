@@ -13,6 +13,12 @@ contract without migration support for earlier development formats.
 - Portable installation-boundary metadata and workflow guidance that confines
   setup, features, generated state, and ordinary edits to the selected product.
 
+### Fixed
+
+- PowerShell restricted-path guard symlink/junction resolution on current .NET,
+  preventing canonical paths from falling through to `allow`.
+- Wheel-content CI verification for the top-level bundled state controller.
+
 ## 0.6.0 - 2026-07-18
 
 ### Added
