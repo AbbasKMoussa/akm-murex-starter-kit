@@ -46,6 +46,31 @@ Goal: confirm `akmaestro init` works on Windows and lays files down correctly.
 
 Record the skill count and whether each expected path exists.
 
+### A2 — Explicit subproject installation
+
+Create a separate scratch Git root and a product below it:
+
+```powershell
+Set-Location ..
+New-Item -ItemType Directory -Force akm-subproject-scratch\products\pricing | Out-Null
+Set-Location akm-subproject-scratch
+git init
+Set-Location products\pricing
+uvx --refresh --from git+https://github.com/AbbasKMoussa/akm-murex-starter-kit.git akmaestro init --subproject
+```
+
+**Expected:**
+- The command exits 0 and reports `Scope: explicit subproject root`.
+- `.github`, `.agentic`, `.gitignore`, and `AGENTS.md` are created under
+  `products\pricing`, not at `akm-subproject-scratch`.
+- The manifest records `"installation_mode": "subproject"`,
+  `"project_root": "."`, and `"git_root": "../.."`.
+- `akmaestro update` fails from this directory without the flag, while
+  `akmaestro update --subproject` succeeds.
+
+Open `products\pricing` directly as the VS Code workspace for any live
+subproject checks. Return to `akm-scratch` before Phase B.
+
 ---
 
 ## Phase B — PowerShell hook unit tests

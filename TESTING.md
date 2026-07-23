@@ -41,6 +41,31 @@ uvx --refresh --from git+https://github.com/AbbasKMoussa/akm-murex-starter-kit.g
 Options: `--dry-run` to preview, `--no-hooks` to skip hook assets, and
 `--path <dir>` to target another Git root. Installed hook assets start disabled.
 
+### Subproject exception
+
+To exercise an independent product below a shared Git root:
+
+```bash
+mkdir -p products/pricing
+cd products/pricing
+uvx --refresh --from git+https://github.com/AbbasKMoussa/akm-murex-starter-kit.git \
+  akmaestro init --subproject
+```
+
+Confirm `.github/`, `.agentic/`, `.gitignore`, and `AGENTS.md` exist under
+`products/pricing`, none were created at the enclosing Git root, and the
+manifest contains `installation_mode: "subproject"`, `project_root: "."`, and
+the correct relative `git_root`. Confirm both commands reject the nested target
+without `--subproject`, then run:
+
+```bash
+akmaestro update --subproject
+```
+
+Open `products/pricing` itself in a fresh VS Code window or start Copilot CLI
+there. Run `/status`, `/akmaestro-init`, and a small `/feature`; verify discovery
+and that no inspection, state, or edits leak into sibling products.
+
 ## 2. Team lead runs Stage 1 in Copilot
 
 1. Open Copilot at the repo root in a **fresh VS Code window or a new CLI

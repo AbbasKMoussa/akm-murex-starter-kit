@@ -43,6 +43,12 @@ fix when not `ok`.
 - `jq` missing → **warn**: the bash hook guards fall through to allow without it.
 - Note the detected surface (Copilot CLI vs VS Code) if determinable; otherwise
   say it is unknown.
+- `.agentic/setup/kit-manifest.json` has `installation_mode` of `repository` or
+  `subproject` (`repository` when absent for a legacy install), `project_root`
+  of `.`, and a portable relative `git_root`. Resolve it and compare it with
+  `git rev-parse --show-toplevel`. A mismatch or running outside the recorded
+  AKMaestro root is **fail**. In subproject mode, do not diagnose sibling
+  products or write outside the subproject.
 
 ### 2. Instruction files
 

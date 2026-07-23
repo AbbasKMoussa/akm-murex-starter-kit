@@ -1,7 +1,7 @@
 # Setup Flow Decisions
 
 Date: 2026-06-19
-Last updated: 2026-07-18
+Last updated: 2026-07-23
 
 ## Context
 
@@ -268,12 +268,35 @@ The flow may span multiple sessions, so setup state must be persisted on disk.
     the reviewed preimage. This removes ambiguity and rejects changes made
     between review and application.
 
-29. Installer scope is an exact existing Git root (decided).
+29. Installer scope defaults to an exact existing Git root (revised decision).
 
     The CLI fails before writing for nested targets, reserved entry-point
     collisions, and symlinked destination parents. `--dry-run` previews init and
     update. Files and the manifest are written atomically; updates remove only
     untouched retired kit assets and preserve explicit hook activation.
+
+30. Independent products below a shared Git root use explicit subproject mode
+    (decided exception).
+
+    `akmaestro init --subproject` accepts a directory strictly below an existing
+    Git root and installs the complete repo-local asset set under that product.
+    The mode is never inferred: both `init` and `update` require the flag, and a
+    Git-root target rejects it. The manifest stores `installation_mode`,
+    `project_root: "."`, and a portable relative `git_root`; context mismatches
+    fail before writing.
+
+    The selected product is the workflow, command, state, generated-output, and
+    default edit boundary. The enclosing root is metadata for applicable Git/CI
+    policies and requested Git operations, not another product to initialize.
+    Sibling products are not scanned. Work outside the product still requires a
+    separately declared modifiable dependency and an explicit feature need.
+
+    This is for the exceptional case where one Git repository contains products
+    with independent lifecycles but no nested `.git` directories. Ordinary
+    complex modules continue to use root initialization plus
+    `/setup-instructions module <path>`. Developers must open the product as the
+    VS Code workspace or start Copilot CLI there so its nested `.github`
+    customizations are the active workspace customizations.
 
 The integrated Stage 1 spec (orchestrator, bootstrap, detection, state schema,
 merge policy, universal status, and flow help) lives in `docs/setup-flow.md`. The four topic
@@ -281,9 +304,16 @@ docs hold the per-topic depth.
 
 ## GitHub Copilot CLI Constraints
 
-Verified from GitHub docs (2026-06):
+Verified from GitHub and VS Code docs (2026-07):
 
-- Copilot CLI reads `AGENTS.md` and `.github/copilot-instructions.md` (both used if present); also `CLAUDE.md` / `GEMINI.md` at repo root, and a user-level `~/.copilot/copilot-instructions.md`.
+- Copilot CLI discovers repository instructions from the repository root,
+  current working directory, and intermediate directories. VS Code discovers
+  all customization types under the opened workspace; parent-repository
+  discovery is optional and disabled by default. Subproject mode therefore
+  requires the selected product to be the working directory/workspace root.
+- Copilot CLI reads `AGENTS.md` and `.github/copilot-instructions.md` (both used
+  if present); also `CLAUDE.md` / `GEMINI.md` and a user-level
+  `~/.copilot/copilot-instructions.md`.
 - Custom agents are `*.agent.md` Markdown files in `.github/agents/` (repo) or `~/.copilot/agents/` (user); invoked via the `/agent` slash command, the `--agent <name>` CLI flag, or natural-language inference from the agent description.
 - **Copilot CLI has no support for user-defined slash commands backed by reusable
   prompt files** (for example `.github/prompts/*.prompt.md`). A prompt file is
@@ -294,6 +324,7 @@ Sources:
 
 - https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-custom-instructions
 - https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/create-custom-agents-for-cli
+- https://code.visualstudio.com/docs/agent-customization/overview
 - https://github.com/github/copilot-cli/issues/618
 
 ## GitHub Copilot Agent Skills

@@ -16,6 +16,17 @@ Stage 2 carries work through gated specialist phases. Shared continuity lives in
 committed feature state and artifacts; the developer's selected feature and
 readiness live only under `.agentic/local/`.
 
+## Installation scope
+
+Read `.agentic/setup/kit-manifest.json`. `installation_mode: subproject` means
+the directory containing the manifest is the product boundary. Run all
+controller commands, requirements, feature artifacts, verification, and normal
+edits from that directory. The enclosing Git root is only for requested Git
+operations. Do not inspect or edit outside the subproject unless setup records
+the target as a modifiable dependency and this feature explicitly requires it.
+If Copilot is not running from the recorded AKMaestro root, stop and direct the
+developer to reopen that product before running `/feature`.
+
 ## Controller and entry gate
 
 Read `.agentic/STATE-PROTOCOL.md`. Use:

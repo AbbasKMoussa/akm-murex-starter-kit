@@ -16,9 +16,24 @@ uvx akmaestro init
 ```
 
 Before registry publication, `uvx --from git+<internal-url> akmaestro init` runs
-the same command without cloning this repository. The target must be an existing
-Git root. `--dry-run` previews destinations, `--no-hooks` omits hook assets, and
-`--path <root>` selects another repository.
+the same command without cloning this repository. By default, the target must
+be an existing exact Git root. `--dry-run` previews destinations, `--no-hooks`
+omits hook assets, and `--path <root>` selects another repository.
+
+`--subproject` is an explicit exception for an independently operated product
+below an enclosing Git root when the product has no `.git` of its own. The
+selected product becomes the AKMaestro root and receives its own `.github/`,
+`.agentic/`, `.gitignore`, and `AGENTS.md`; the enclosing Git root is not
+modified. The manifest records `installation_mode`, `project_root: "."`, and a
+portable relative `git_root`. `init` and `update` both require the explicit
+flag. A Git-root target rejects the flag so the exceptional mode cannot silently
+replace normal behavior.
+
+Subproject users open that product as the VS Code workspace or start Copilot CLI
+there. Every workflow path, command, state record, generated file, and ordinary
+edit is scoped to the product. The enclosing root is consulted only for shared
+Git and CI policy or requested Git operations. Other products are not scanned
+or modified unless one is separately declared as a modifiable dependency.
 
 The installer creates absent files and never overwrites an existing file.
 Reserved AKMaestro entry-point collisions fail before installation. It refuses
@@ -32,7 +47,7 @@ activation consent survives updates.
 
 ## Installed assets
 
-| Package asset | Repository destination | Ownership |
+| Package asset | AKMaestro-root destination | Ownership |
 | --- | --- | --- |
 | `assets/skills/*` | `.github/skills/<name>/` | 19 bundled skills |
 | `state.py` | `.agentic/bin/akmaestro-state.py` | kit-owned controller |
@@ -95,6 +110,10 @@ gitignored `.agentic/local/`. Detection covers:
 - CI configuration and documented Git policies;
 - complex modules, restricted paths, and existing agent customization;
 - sibling repositories, each confirmed as `modifiable` or `read-only`.
+
+In subproject mode, "repository facts" means facts about the selected product.
+Detection does not traverse sibling products. It may read the enclosing Git
+root only for policies and CI facts that apply to the product.
 
 The agent presents one sourced matrix and asks only about missing, conflicting,
 or low-confidence rows. History can suggest a pattern but does not establish

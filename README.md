@@ -46,6 +46,42 @@ Use `--refresh` to pick up the latest version, `--no-hooks` to skip hooks,
 `--path <dir>` to target another directory. Once published to the registry this
 becomes simply `uvx akmaestro init`.
 
+### Exception: an independent product below the Git root
+
+The default installer still requires the exact Git root. For a repository that
+contains multiple independent products without nested `.git` directories, opt
+one product into explicit subproject mode:
+
+```bash
+cd products/pricing
+uvx --from git+https://github.com/AbbasKMoussa/akm-murex-starter-kit.git \
+  akmaestro init --subproject
+```
+
+From another directory, combine the flag with `--path`:
+
+```bash
+uvx --from git+https://github.com/AbbasKMoussa/akm-murex-starter-kit.git \
+  akmaestro init --subproject --path products/pricing
+```
+
+This installs `.github/`, `.agentic/`, `.gitignore`, and `AGENTS.md` under the
+selected product only. The manifest records `installation_mode: subproject` and
+a portable relative path to the enclosing Git root. Setup and feature work use
+the product as their inspection, command, state, and edit boundary; the parent
+root is used only for Git policy and Git operations. Updates require the same
+explicit boundary:
+
+```bash
+akmaestro update --subproject
+```
+
+Open the selected product itself as the VS Code workspace, or start Copilot CLI
+from that directory. Nested `.github` files are product-local Copilot
+customizations, not repository-wide GitHub configuration. Do not use this mode
+for an ordinary module that shares its product lifecycle with the repository;
+use `/setup-instructions module <path>` after normal initialization instead.
+
 The installer lays down all 19 skills, the optional hook files in a disabled
 state, minimal instruction
 pointers, schemas, and the repo-local deterministic state controller. Dynamic
@@ -74,11 +110,12 @@ Copilot session.
 
 Skills and hooks are only discovered in a **new** Copilot session. After
 installing (and after any step that adds skills/hooks/tooling), open a fresh
-VS Code window or start a new CLI session at the repo root before continuing.
+VS Code window or start a new CLI session at the AKMaestro root: normally the
+Git root, or the selected product root in explicit subproject mode.
 
 ## Stage 1 — team lead initializes the repository
 
-The team lead opens a fresh Copilot session at the repo root:
+The team lead opens a fresh Copilot session at the AKMaestro root:
 
 ```text
 /akmaestro-init

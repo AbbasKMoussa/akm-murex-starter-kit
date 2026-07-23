@@ -20,6 +20,7 @@ import re
 import stat
 import subprocess
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Dict, List, Optional, Tuple
 
@@ -40,20 +41,42 @@ AUDIT_IGNORE = ".agentic/audit/"
 MANIFEST_REL = ".agentic/setup/kit-manifest.json"
 HOOKS_CONFIG_REL = ".github/hooks/hooks.json"
 RESERVED_SKILLS = ("akmaestro-init", "status", "feature")
+INSTALLATION_MODES = ("repository", "subproject")
 
 
 class InstallerError(RuntimeError):
     """A target-repository condition that requires user action."""
 
 
+@dataclass(frozen=True)
+class InstallationContext:
+    project_root: Path
+    git_root: Path
+    mode: str
+
+    def manifest_fields(self) -> Dict[str, str]:
+        return {
+            "installation_mode": self.mode,
+            "project_root": ".",
+            "git_root": Path(
+                os.path.relpath(self.git_root, self.project_root)
+            ).as_posix(),
+        }
+
+
 def init(
-    target: str = ".", with_hooks: bool = True, dry_run: bool = False
+    target: str = ".",
+    with_hooks: bool = True,
+    dry_run: bool = False,
+    subproject: bool = False,
 ) -> Dict[str, List[str]]:
     """Install the kit into ``target``. Idempotent and non-destructive."""
-    root = _repository_root(target)
+    context = _installation_context(target, subproject)
+    root = context.project_root
     results: Dict[str, List[str]] = {"created": [], "skipped": []}
     _preflight_runtime_paths(root, with_hooks)
     manifest = _load_manifest(root)
+    _apply_installation_context(manifest, context)
     _check_reserved_skill_collisions(root)
     hooks_were_installed = bool(
         manifest.get("hooks_installed", _hooks_were_installed(root, manifest))
@@ -112,7 +135,10 @@ def init(
 
 
 def update(
-    target: str = ".", force: bool = False, dry_run: bool = False
+    target: str = ".",
+    force: bool = False,
+    dry_run: bool = False,
+    subproject: bool = False,
 ) -> Dict[str, List[str]]:
     """Refresh kit-owned files in ``target`` to this kit version.
 
@@ -121,7 +147,8 @@ def update(
     Customized files and files with unknown provenance (installed before the
     manifest existed) are kept, unless ``force`` is passed.
     """
-    root = _repository_root(target)
+    context = _installation_context(target, subproject)
+    root = context.project_root
     results: Dict[str, List[str]] = {
         "created": [],
         "updated": [],
@@ -130,7 +157,14 @@ def update(
         "removed": [],
     }
     _safe_destination(root, MANIFEST_REL)
+    manifest_existed = (root / MANIFEST_REL).exists()
     manifest = _load_manifest(root)
+    if context.mode == "subproject" and not manifest_existed:
+        raise InstallerError(
+            "subproject update requires an existing subproject installation; "
+            "run 'akmaestro init --subproject' first"
+        )
+    _apply_installation_context(manifest, context)
     from_version = manifest.get("kit_version")
     hooks_installed = bool(
         manifest.get("hooks_installed", _hooks_were_installed(root, manifest))
@@ -239,10 +273,34 @@ def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def _repository_root(target: str) -> Path:
+def _installation_context(target: str, subproject: bool) -> InstallationContext:
     root = Path(target).resolve()
     if not root.is_dir():
         raise InstallerError(f"target is not a directory: {root}")
+    git_root = _find_git_root(root)
+    if git_root != root and git_root not in root.parents:
+        raise InstallerError(
+            f"Git reported a root that does not contain the target: {git_root}"
+        )
+    if subproject:
+        if git_root == root:
+            raise InstallerError(
+                "target is already the Git root; omit --subproject for a normal "
+                "repository installation"
+            )
+        relative = root.relative_to(git_root)
+        if relative.parts and relative.parts[0] == ".git":
+            raise InstallerError("a Git metadata directory cannot be a subproject root")
+        return InstallationContext(root, git_root, "subproject")
+    if git_root != root:
+        raise InstallerError(
+            f"target must be the Git root: {git_root}; pass --subproject only "
+            "when this directory is intentionally an independent product"
+        )
+    return InstallationContext(root, git_root, "repository")
+
+
+def _find_git_root(root: Path) -> Path:
     try:
         proc = subprocess.run(
             ["git", "-C", str(root), "rev-parse", "--show-toplevel"],
@@ -255,10 +313,19 @@ def _repository_root(target: str) -> Path:
         raise InstallerError(f"cannot verify Git repository root: {exc}") from exc
     if proc.returncode != 0:
         raise InstallerError("target must be the root of an existing Git repository")
-    git_root = Path(proc.stdout.strip()).resolve()
-    if git_root != root:
-        raise InstallerError(f"target must be the Git root: {git_root}")
-    return root
+    return Path(proc.stdout.strip()).resolve()
+
+
+def _apply_installation_context(manifest: Dict, context: InstallationContext) -> None:
+    expected = context.manifest_fields()
+    for field, value in expected.items():
+        existing = manifest.get(field)
+        if existing is not None and existing != value:
+            raise InstallerError(
+                "kit manifest installation boundary does not match the selected "
+                f"target: {field} is {existing!r}, expected {value!r}"
+            )
+    manifest.update(expected)
 
 
 def _safe_destination(root: Path, relative: str) -> Path:
@@ -423,6 +490,31 @@ def _load_manifest(root: Path) -> Dict:
         for field in ("hooks_installed", "hooks_enabled"):
             if field in manifest and not isinstance(manifest[field], bool):
                 raise InstallerError(f"kit manifest field {field} must be boolean")
+        mode = manifest.get("installation_mode")
+        if mode is not None and mode not in INSTALLATION_MODES:
+            raise InstallerError(
+                f"kit manifest field installation_mode is invalid: {mode!r}"
+            )
+        project_root = manifest.get("project_root")
+        if project_root is not None and project_root != ".":
+            raise InstallerError("kit manifest field project_root must be '.'")
+        git_root = manifest.get("git_root")
+        if git_root is not None and (
+            not isinstance(git_root, str)
+            or (
+                git_root != "."
+                and (
+                    "\\" in git_root
+                    or PurePosixPath(git_root).is_absolute()
+                    or not PurePosixPath(git_root).parts
+                    or any(part != ".." for part in PurePosixPath(git_root).parts)
+                )
+            )
+        ):
+            raise InstallerError(
+                "kit manifest field git_root must be '.' or a normalized "
+                "repository-relative ancestor path"
+            )
         return manifest
     return {"version": 1, "kit_version": __version__, "files": {}}
 

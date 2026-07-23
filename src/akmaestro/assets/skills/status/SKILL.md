@@ -28,6 +28,12 @@ Do not create, select, install, remediate, or advance anything. Never call
 `setup-init`, `setup-transition`, `feature-select`, or any other mutating state
 command. Readiness probes must use `readiness-check --no-write`.
 
+Read `.agentic/setup/kit-manifest.json` first. Report its `installation_mode` as
+`repository` or `subproject`; a missing field means a legacy `repository`
+installation. In subproject mode, verify that `project_root` is `.` and the
+relative `git_root` resolves to Git's enclosing root. A mismatch is invalid
+installation state: stop with `/doctor` and do not search the parent repository.
+
 ## Help
 
 For `/status help` or a general request for AKMaestro help, explain and stop:
@@ -91,6 +97,7 @@ Keep the output scannable and omit empty feature fields:
 
 ```text
 AKMaestro status
+Scope       repository
 Flow        feature
 Setup       complete (revision 8)
 Readiness   ready

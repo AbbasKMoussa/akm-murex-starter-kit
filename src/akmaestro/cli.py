@@ -23,7 +23,14 @@ def main(argv: Optional[List[str]] = None) -> int:
         "init", help="Install the starter kit into the current repository"
     )
     p_init.add_argument(
-        "--path", default=".", help="Target repository root (default: cwd)"
+        "--path",
+        default=".",
+        help="Target Git root, or product root with --subproject (default: cwd)",
+    )
+    p_init.add_argument(
+        "--subproject",
+        action="store_true",
+        help="Explicitly treat a directory below the Git root as an independent product",
     )
     p_init.add_argument("--no-hooks", action="store_true", help="Do not install hooks")
     p_init.add_argument(
@@ -35,7 +42,14 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Refresh kit-owned files to this kit version (customized files are kept)",
     )
     p_update.add_argument(
-        "--path", default=".", help="Target repository root (default: cwd)"
+        "--path",
+        default=".",
+        help="Target Git root, or product root with --subproject (default: cwd)",
+    )
+    p_update.add_argument(
+        "--subproject",
+        action="store_true",
+        help="Update an installation rooted in an independent product below the Git root",
     )
     p_update.add_argument(
         "--force",
@@ -55,8 +69,10 @@ def main(argv: Optional[List[str]] = None) -> int:
                     target=args.path,
                     with_hooks=not args.no_hooks,
                     dry_run=args.dry_run,
+                    subproject=args.subproject,
                 ),
                 dry_run=args.dry_run,
+                subproject=args.subproject,
             )
         elif args.command == "update":
             _report_update(
@@ -64,8 +80,10 @@ def main(argv: Optional[List[str]] = None) -> int:
                     target=args.path,
                     force=args.force,
                     dry_run=args.dry_run,
+                    subproject=args.subproject,
                 ),
                 dry_run=args.dry_run,
+                subproject=args.subproject,
             )
     except installer.InstallerError as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -76,7 +94,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     return 0
 
 
-def _report_init(results, dry_run=False) -> None:
+def _report_init(results, dry_run=False, subproject=False) -> None:
     for f in results["created"]:
         print(f"  + {f}")
     for f in results["skipped"]:
@@ -87,11 +105,16 @@ def _report_init(results, dry_run=False) -> None:
         f"{verb} {len(results['created'])} file(s); "
         f"left {len(results['skipped'])} existing file(s) untouched."
     )
+    if subproject:
+        print(
+            "Scope: explicit subproject root (the enclosing Git root was not modified)."
+        )
     if dry_run:
         return
     print()
     print(
-        "Next: the team lead opens Copilot (VS Code or CLI) at the repo root and runs:"
+        "Next: the team lead opens Copilot (VS Code or CLI) at the "
+        f"{'subproject' if subproject else 'repo'} root and runs:"
     )
     print("    /akmaestro-init")
     print('or say: "let\'s run the initialization flow".')
@@ -100,7 +123,7 @@ def _report_init(results, dry_run=False) -> None:
     )
 
 
-def _report_update(results, dry_run=False) -> None:
+def _report_update(results, dry_run=False, subproject=False) -> None:
     for f in results["updated"]:
         print(f"  ~ {f} (updated)")
     for f in results["created"]:
@@ -118,6 +141,8 @@ def _report_update(results, dry_run=False) -> None:
         f"kept {len(results['kept'])} customized; "
         f"{len(results['up_to_date'])} already up to date."
     )
+    if subproject:
+        print("Scope: explicit subproject root.")
     if not dry_run and (results["updated"] or results["created"] or results["removed"]):
         print()
         print(

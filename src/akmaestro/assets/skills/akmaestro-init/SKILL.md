@@ -23,6 +23,19 @@ Mandatory topics may finish `blocked` only for a recorded environment or policy
 reason. Existing files remain non-destructive: show and confirm every merge or
 replacement; create absent files directly.
 
+## Installation scope
+
+Read `.agentic/setup/kit-manifest.json` before detection. When
+`installation_mode` is `subproject`, the directory containing that manifest is
+the complete product and AKMaestro boundary. Inspect, ask about, generate, and
+validate only that product. The manifest's relative `git_root` identifies the
+enclosing Git root for shared branch, commit, and CI policy discovery; it is not
+another product root and must not receive AKMaestro assets from this flow. Do
+not scan sibling products. Require Copilot to be opened at the subproject root.
+
+For a normal `repository` installation, retain the repository-wide behavior
+below. An absent `installation_mode` is a legacy normal installation.
+
 ## Controller
 
 Read `.agentic/STATE-PROTOCOL.md`, then use only:
@@ -79,7 +92,7 @@ Do not restart completed topics automatically.
    evidence and leave the current topic resumable. Print exactly:
 
    ```text
-   Next: open a new Copilot session at the repository root and run /akmaestro-init
+   Next: open a new Copilot session at the AKMaestro root and run /akmaestro-init
    ```
 
    Do not tell the user to resume with a topic skill, status, or help command.

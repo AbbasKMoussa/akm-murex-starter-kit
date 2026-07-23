@@ -104,7 +104,7 @@ the current Copilot surface requires it. Persist evidence and requirements first
 leave tooling `in_progress`, and use exactly this handoff:
 
 ```text
-Next: open a new Copilot session at the repository root and run /akmaestro-init
+Next: open a new Copilot session at the AKMaestro root and run /akmaestro-init
 ```
 
 Do not request a second restart merely because a graph was regenerated or VS

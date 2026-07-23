@@ -1,7 +1,7 @@
 # AGENTS.md
 
 > This is a placeholder created by AKMaestro. The team lead runs `/akmaestro-init` once to
-> replace it with real, repo-specific instructions and commits the result. Other
+> replace it with real, project-specific instructions and commits the result. Other
 > developers start with `/feature`; the `setup-instructions` skill fills in the
 > sections below from detected facts and the lead's answers.
 

@@ -8,6 +8,29 @@ mutation:
 uv run --no-project python .agentic/bin/akmaestro-state.py <command>
 ```
 
+## Installation boundary
+
+Read `.agentic/setup/kit-manifest.json` before inspecting or changing project
+files. `installation_mode` defines the AKMaestro root:
+
+- `repository` (or an absent field from a legacy installation): the AKMaestro
+  root and Git root are the same directory;
+- `subproject`: the current directory is an explicitly isolated product below
+  the Git root. `project_root` is `.` and `git_root` is a portable relative path
+  to the enclosing Git root.
+
+All workflow paths, commands, state, generated files, and ordinary edits are
+relative to the AKMaestro root. In subproject mode, use the enclosing Git root
+only to read shared Git policy and perform requested Git operations. Do not
+scan sibling products or treat the enclosing repository as the product. Do not
+edit outside the subproject unless the path is a separately declared modifiable
+dependency and the task explicitly requires it.
+
+Run Copilot with the AKMaestro root as its working directory: the repository
+root for normal installations or the selected product root for subproject
+installations. Stop with `/doctor` if the manifest boundary does not match the
+current directory or Git reports a different enclosing root.
+
 ## Persistence boundary
 
 Committed:
@@ -70,7 +93,7 @@ same read-only diff before an unowned `.github/AGENTIC.md` may be replaced.
 ## Repository and developer readiness
 
 `/akmaestro-init` is run once by the team lead. Its committed completion state is the
-repository-level gate. Tooling setup also writes committed environment
+AKMaestro-root gate. Tooling setup also writes committed environment
 requirements for `uv`, Graphifyy, the selected LSPs, and required generated
 artifacts.
 

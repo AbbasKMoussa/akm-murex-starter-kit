@@ -6,7 +6,12 @@ contract without migration support for earlier development formats.
 
 ## Unreleased
 
-- No changes yet.
+### Added
+
+- Explicit `init --subproject` and `update --subproject` support for an
+  independently operated product below a shared Git root.
+- Portable installation-boundary metadata and workflow guidance that confines
+  setup, features, generated state, and ordinary edits to the selected product.
 
 ## 0.6.0 - 2026-07-18
 

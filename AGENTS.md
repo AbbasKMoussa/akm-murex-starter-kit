@@ -69,8 +69,12 @@ Agreed initialization topics:
 Stage 1 is implemented in `src/akmaestro/`: a Python installer
 (`cli.py` + `installer.py`, commands `init` and `update` — `update` refreshes
 kit-owned files via the sha256 manifest in `.agentic/setup/kit-manifest.json`
-and never touches customized files), the repo-local deterministic state
-controller (`state.py`), and installable assets under `assets/`: all 19 skills,
+and never touches customized files). Both commands preserve exact-Git-root
+behavior by default and accept explicit `--subproject` mode for an independent
+product below a shared Git root, with a product-local asset/state boundary and
+portable enclosing-root metadata. Stage 1 also includes the repo-local
+deterministic state controller (`state.py`) and installable assets under
+`assets/`: all 19 skills,
 state schemas/protocol, hooks, and bootstrap templates. The installer/controller
 enforce v3 state contracts, strict topic evidence, ledger-backed safe
 argument-array action checks, deterministic merge/finalization, and
@@ -94,7 +98,7 @@ dogfood copies, avoiding the Stage 1 duplication).
 Remaining release work: run the revised `/akmaestro-init` and `/feature` flows end to end
 in real Copilot CLI and VS Code sessions, verify local remediation and
 interruption recovery, re-confirm live hooks on each surface, exercise the
-multi-repo boundary, and publish to the internal registry.
+multi-repo and subproject boundaries, and publish to the internal registry.
 
 The shared `/status` skill is implemented as read-only orientation: it reports
 initialization until setup is complete, then local readiness and feature state.

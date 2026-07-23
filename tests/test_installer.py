@@ -134,6 +134,29 @@ def test_status_skill_is_read_only_universal_orientation():
     assert "Do not execute or delegate" in text
 
 
+def test_subproject_scope_guidance_is_bundled():
+    protocol = (ASSETS / "runtime" / "STATE-PROTOCOL.md").read_text(encoding="utf-8")
+    init_skill = (ASSETS / "skills" / "akmaestro-init" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    feature_skill = (ASSETS / "skills" / "feature" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    status_skill = (ASSETS / "skills" / "status" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    doctor_skill = (ASSETS / "skills" / "doctor" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+
+    for text in (protocol, init_skill, feature_skill, status_skill, doctor_skill):
+        assert "installation_mode" in text
+        assert "subproject" in text
+    assert "Do not scan sibling products" in " ".join(protocol.split())
+    assert "enclosing Git root" in init_skill
+    assert "outside the subproject" in feature_skill
+
+
 def test_setup_skills_use_controller_evidence_and_single_status_source():
     for name in ("setup-instructions", "setup-tooling", "setup-skills", "setup-hooks"):
         text = (ASSETS / "skills" / name / "SKILL.md").read_text(encoding="utf-8")
@@ -234,8 +257,110 @@ def test_init_dry_run_writes_nothing(tmp_path):
 def test_init_requires_exact_git_root(tmp_path):
     nested = tmp_path / "nested"
     nested.mkdir()
-    with pytest.raises(installer.InstallerError, match="Git root"):
+    with pytest.raises(installer.InstallerError, match="--subproject"):
         installer.init(str(nested))
+
+
+def test_subproject_install_is_explicit_and_isolated(tmp_path):
+    product = tmp_path / "products" / "pricing"
+    product.mkdir(parents=True)
+
+    installer.init(str(product), subproject=True)
+
+    assert (product / ".github" / "skills" / "akmaestro-init" / "SKILL.md").is_file()
+    assert (product / ".agentic" / "bin" / "akmaestro-state.py").is_file()
+    assert (product / "AGENTS.md").is_file()
+    assert (product / ".gitignore").is_file()
+    assert not (tmp_path / ".github").exists()
+    assert not (tmp_path / ".agentic").exists()
+    assert not (tmp_path / "AGENTS.md").exists()
+    assert not (tmp_path / ".gitignore").exists()
+
+    manifest = _manifest(product)
+    assert manifest["installation_mode"] == "subproject"
+    assert manifest["project_root"] == "."
+    assert manifest["git_root"] == "../.."
+
+
+def test_subproject_mode_rejects_the_git_root(tmp_path):
+    with pytest.raises(installer.InstallerError, match="omit --subproject"):
+        installer.init(str(tmp_path), subproject=True)
+
+    assert not (tmp_path / ".agentic").exists()
+
+
+def test_subproject_dry_run_writes_nothing(tmp_path):
+    product = tmp_path / "products" / "pricing"
+    product.mkdir(parents=True)
+    before = {path.relative_to(tmp_path) for path in tmp_path.rglob("*")}
+
+    results = installer.init(str(product), subproject=True, dry_run=True)
+
+    assert results["created"]
+    assert {path.relative_to(tmp_path) for path in tmp_path.rglob("*")} == before
+
+
+def test_subproject_update_requires_an_existing_installation(tmp_path):
+    product = tmp_path / "products" / "pricing"
+    product.mkdir(parents=True)
+
+    with pytest.raises(installer.InstallerError, match="existing subproject"):
+        installer.update(str(product), subproject=True)
+
+    assert not (product / ".agentic").exists()
+    assert not (product / ".github").exists()
+
+
+def test_subproject_update_requires_explicit_mode_and_preserves_boundary(tmp_path):
+    product = tmp_path / "products" / "pricing"
+    product.mkdir(parents=True)
+    installer.init(str(product), subproject=True)
+    kit_owned = product / ".github" / "skills" / "doctor" / "SKILL.md"
+    original = kit_owned.read_bytes()
+    kit_owned.write_bytes(b"pretend this is an OLD kit version\n")
+    manifest_path = product / ".agentic" / "setup" / "kit-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["files"][".github/skills/doctor/SKILL.md"] = installer._sha256(
+        kit_owned.read_bytes()
+    )
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(installer.InstallerError, match="--subproject"):
+        installer.update(str(product))
+    results = installer.update(str(product), subproject=True)
+
+    assert kit_owned.read_bytes() == original
+    assert ".github/skills/doctor/SKILL.md" in results["updated"]
+    assert _manifest(product)["installation_mode"] == "subproject"
+    assert not (tmp_path / ".github").exists()
+
+
+def test_subproject_update_rejects_manifest_boundary_tampering(tmp_path):
+    product = tmp_path / "products" / "pricing"
+    product.mkdir(parents=True)
+    installer.init(str(product), subproject=True)
+    manifest_path = product / ".agentic" / "setup" / "kit-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["git_root"] = ".."
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(installer.InstallerError, match="does not match"):
+        installer.update(str(product), subproject=True)
+
+
+def test_cli_subproject_init_and_update(tmp_path, capsys):
+    product = tmp_path / "products" / "pricing"
+    product.mkdir(parents=True)
+
+    rc = cli.main(["init", "--subproject", "--path", str(product)])
+
+    assert rc == 0
+    assert "subproject root" in capsys.readouterr().out
+
+    rc = cli.main(["update", "--subproject", "--path", str(product)])
+
+    assert rc == 0
+    assert "subproject" in capsys.readouterr().out
 
 
 def test_invalid_manifest_is_rejected_without_replacement(tmp_path):
@@ -292,6 +417,9 @@ def test_init_writes_manifest(tmp_path):
     assert manifest["files"][".github/skills/akmaestro-init/SKILL.md"]
     assert manifest["hooks_enabled"] is False
     assert manifest["hooks_config_structure_hash"]
+    assert manifest["installation_mode"] == "repository"
+    assert manifest["project_root"] == "."
+    assert manifest["git_root"] == "."
     assert all("\\" not in key for key in manifest["files"])  # posix keys on all OSes
 
 
