@@ -3,16 +3,15 @@ name: setup-skills
 description: >-
   Verify the complete agent-skill set bootstrapped into this repository's
   .github/skills/. Use for "/setup-skills", "check the installed skills", or the
-  skills step of /init.
-allowed-tools:
-  - shell
+  skills step of /akmaestro-init.
 ---
 
 # setup-skills — verify agent skills
 
-The CLI bootstrap installs all 18 bundled skills into `.github/skills/` before
-this flow starts. Verify that complete set so both `/init` and `/feature` are
-available on every Copilot surface.
+The `akmaestro init` CLI bootstrap installs all 19 bundled skills into
+`.github/skills/` before this flow starts. Verify that complete set so
+`/status`, `/akmaestro-init`, and `/feature`
+are available on every Copilot surface.
 
 ## State protocol
 
@@ -25,7 +24,8 @@ setup state directly.
 
 Confirm all bundled skills are present and valid:
 
-- Stage 1: `init`, `setup-instructions`, `setup-tooling`, `setup-skills`,
+- Shared helper: `status`.
+- Stage 1: `akmaestro-init`, `setup-instructions`, `setup-tooling`, `setup-skills`,
   `setup-hooks`, `teach`, `doctor`.
 - Stage 2: `feature`, `feature-understand`, `feature-frame`, `feature-split`,
   `story-prime`, `story-plan`, `story-implement`, `story-review`, `story-learn`,
@@ -53,20 +53,36 @@ a newly added skill is only visible in a **new** session.
 
 ## New session
 
-If the bootstrap or an update added skills during the current session, ask the
-user to open a new Copilot session so `/<name>` invocation is available. Then
-confirm with `init status`, `init help`, or the surface's skill list.
+The lead already opens a fresh session after the CLI bootstrap. Request another
+session only if an update added or repaired a skill during this running session
+and the current surface cannot observe it. Persist evidence first and resume only
+with `/akmaestro-init`; otherwise return directly to the orchestrator.
 
 ## State
 
-Create local JSON evidence containing the kit version, all 18 bundled skill
+Create local JSON evidence containing the kit version, all 19 bundled skill
 paths, additional team skills, per-skill validation, and new-session result.
 Write it atomically with `evidence-write skills`; this produces committed
 `.agentic/setup/skills-state.json` without a duplicate topic status.
 
+Use exactly this evidence shape. `expectedSkills` and `verifiedSkills` must each
+contain the full catalog listed above when complete:
+
+```json
+{
+  "kitVersion": "<installed version>",
+  "expectedSkills": ["status", "akmaestro-init", "setup-instructions", "setup-tooling", "setup-skills", "setup-hooks", "teach", "doctor", "feature", "feature-understand", "feature-frame", "feature-split", "story-prime", "story-plan", "story-implement", "story-review", "story-learn", "feature-review", "feature-retro"],
+  "verifiedSkills": ["status", "akmaestro-init", "setup-instructions", "setup-tooling", "setup-skills", "setup-hooks", "teach", "doctor", "feature", "feature-understand", "feature-frame", "feature-split", "story-prime", "story-plan", "story-implement", "story-review", "story-learn", "feature-review", "feature-retro"],
+  "collisions": [],
+  "discovery": {"copilotCli": "verified", "vsCode": "not_tested"},
+  "newSessionRequired": false,
+  "blockers": []
+}
+```
+
 ## Completion
 
-Complete when all 18 bundled skills are present with valid `SKILL.md` files and
+Complete when all 19 bundled skills are present with valid `SKILL.md` files and
 intact resources, additional team skills were preserved, nothing was overwritten
 without confirmation, a new session was requested if skills were added in an
 existing session, and state records the results.
@@ -78,4 +94,4 @@ the manual steps are recorded.
 Write evidence first. Then transition `skills` from `in_progress` to `complete`,
 or to `blocked --reason <reason>` for a genuine blocker, using the latest
 aggregate `--expected-revision`. Rerun `setup-status` and report its derived next
-command.
+command. The only cross-session resume command is `/akmaestro-init`.

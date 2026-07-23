@@ -7,14 +7,16 @@ This topic defines what it means to initialize agent instruction files for a tar
 Create properly scoped instruction files so agents understand:
 
 - what the product does;
-- how to build and test the repo;
+- how to bootstrap, build, test, run, and verify the repo;
 - CI expectations;
 - complex modules that need their own local guidance;
 - related repositories;
-- branch and commit conventions;
+- Git workflow conventions and explicit absences;
 - repo-specific safety boundaries.
 
-The setup should ask a small number of practical questions and generate useful files from the answers. Avoid long interviews that busy developers will not complete.
+The setup should detect facts with provenance, present one compact confirmation
+summary, and ask only targeted follow-ups. Avoid long interviews that busy
+developers will not complete.
 
 ## Agreed File Model
 
@@ -24,16 +26,20 @@ Generate or update these files:
 AGENTS.md
 .github/copilot-instructions.md
 .github/instructions/tests.instructions.md
-<complex-module>/AGENTS.md
+.github/instructions/<module-id>.instructions.md
 ```
 
 `AGENTS.md` is the main source of truth.
 
-`.github/copilot-instructions.md` should stay short and direct Copilot to `AGENTS.md`, `.github/instructions/`, and nested `AGENTS.md` files. Avoid duplicating the full root instructions because duplicated instruction sources can conflict.
+`.github/copilot-instructions.md` should stay short and direct Copilot to
+`AGENTS.md` and `.github/instructions/`. Avoid duplicating the full root
+instructions because duplicated instruction sources can conflict.
 
 `.github/instructions/tests.instructions.md` contains test-specific guidance using path-scoped instructions.
 
-Nested module `AGENTS.md` files are generated later for complex modules and should only describe what differs inside that module.
+Path-scoped module files are generated later for complex modules and describe
+only what differs from root guidance. A nested module `AGENTS.md` is generated
+only when the lead explicitly requests cross-agent portability.
 
 ## Phase 1: Root Instruction Setup
 
@@ -43,7 +49,7 @@ Command:
 /setup-instructions
 ```
 
-(Also reachable through the guided `/init`. See `docs/setup-flow.md`.)
+(Also reachable through the guided `/akmaestro-init`. See `docs/setup-flow.md`.)
 
 Creates or updates:
 
@@ -54,28 +60,37 @@ AGENTS.md
 .agentic/setup/instructions-state.json   # controller-written evidence
 ```
 
-### Inputs To Collect
+### Detect, Then Confirm
 
-Ask these questions:
+Inspect README/package/product documentation for purpose; CI, manifests,
+task runners, lockfiles, and contribution docs for commands; and contribution
+docs, repository configuration, pull-request templates, plus recent history for
+Git conventions. Record sources and confidence. The current branch and one
+developer's local environment are not team policy.
 
-1. What is the product and what does it do?
-2. How are tests run?
-3. How is the project built?
-4. How is the app run or served locally, if applicable?
-5. How does a developer verify a change works (manual smoke check or steps)?
-6. What should agents know about CI?
-7. What complex modules exist?
-8. Are there locally checked-out sibling repositories? For each, give its path,
-   purpose, and role: **modifiable** or **read-only**.
-9. What branch naming style should agents follow?
-10. What commit message style should agents follow?
-11. Are there files, directories, or changes agents must not touch without approval?
+Present one confirmation summary covering:
 
-Questions 2–5 (build / test / run / verify) feed the smoke-verify in the
-completion criteria — the flow runs build and test once to confirm the captured
-commands actually work.
+1. product summary, consumers, and primary workflows;
+2. bootstrap, build, test, lint, typecheck, run, and automated verification;
+3. manual verification steps, ensuring at least one verification path exists;
+4. base branch, branch naming, commit style, direct-push, pull-request, signing,
+   and ticket-reference policies;
+5. CI, complex modules, sibling repositories, and restricted areas.
 
-Only ask follow-up questions when the answer is incomplete or has direct setup consequences. Related repositories and product purpose are the most likely answers to need follow-up.
+Only follow up where the proposed answer is incomplete or ambiguous. Never
+invent a command or Git policy. Commands must be explicitly `configured` or
+`not_applicable`; policies must be `defined`, `none`, or `unspecified`. Every
+negative disposition requires a reason.
+
+Before a bootstrap or other machine-changing action, show the structured action
+and obtain confirmation. Check finite actions through controller `action-check`,
+which uses an argument array, no shell, a relative working directory, and a
+timeout. Preserve its controller-issued check ID, action hash, and timestamp in
+evidence; every passing
+command result needs a matching passing check for each configured action.
+Build, test, lint, typecheck, and automated verification must pass or have a
+genuine environmental blocker. A long-running server may be documented or
+verified through a bounded startup and health check.
 
 ### Root AGENTS.md Template
 
@@ -105,6 +120,11 @@ Only ask follow-up questions when the answer is incomplete or has direct setup c
 ## Stack
 
 <auto-detected stack summary, with user corrections if needed>
+
+## Setup
+
+Run the confirmed dependency/bootstrap actions, or state why setup is not
+applicable.
 
 ## Build
 
@@ -156,13 +176,18 @@ The following modules need scoped setup:
 
 - `<path>`: <short purpose/status>
 
-Each complex module should get a nested `AGENTS.md` through
+Each complex module should get a scoped `.instructions.md` file through
 `/setup-instructions module <path>`.
 
 ## Git Workflow
 
+- Base branch: `<base branch>`
 - Branch naming: `<branch style>`
 - Commit style: `<commit style>`
+- Direct pushes: `<allowed / prohibited / unspecified with reason>`
+- Pull requests: `<requirements or none>`
+- Commit signing: `<requirements or none>`
+- Ticket references: `<requirements or none>`
 
 ## Agent Rules
 
@@ -181,7 +206,7 @@ Each complex module should get a nested `AGENTS.md` through
 
 Use the repository-wide instructions in `AGENTS.md` as the source of truth.
 
-Also apply path-specific instructions in `.github/instructions/` and any nested `AGENTS.md` files in the area being modified.
+Also apply path-specific instructions in `.github/instructions/`.
 
 When instructions conflict, prefer the most specific instruction for the files being changed.
 ````
@@ -211,12 +236,18 @@ applyTo: "**/*test*,**/*spec*,**/tests/**,**/test/**"
 
 `setup-instructions` is complete when:
 
-- root `AGENTS.md` exists and contains product, build, test, run, verify, CI, module, repo, branch, commit, and safety guidance;
+- root `AGENTS.md` exists without bootstrap placeholders and contains product,
+  setup, build, test, run, verify, CI, module, workspace, Git, and safety guidance;
 - `.github/copilot-instructions.md` exists and points to the canonical instructions;
 - `.github/instructions/tests.instructions.md` exists and includes the test command;
-- **smoke-verify has run**: the captured build and test commands were executed once and passed (or were recorded as `blocked` with a reason — air-gapped, missing deps, long-running — never silently skipped). This is what makes the agent's run/verify loop trustworthy;
+- every canonical command is configured or explicitly not applicable;
+- configured finite checks passed or have a genuine `blocked` result, while
+  bootstrap/run may be documented when execution is inappropriate;
+- at least one automated or manual verification path exists;
+- all six Git policies are defined, absent, or unspecified explicitly;
 - `.agentic/setup/instructions-state.json` records controller-written evidence
-  for answers, generated files, pending modules, and smoke verification;
+  for product, commands/results, verification, Git workflow, repository context,
+  generated files, and pending modules;
 - after evidence is written, the controller makes the authoritative topic
   transition to `complete` or documented `blocked`;
 - existing instruction files were merged per the section-aware policy, not overwritten.
@@ -233,79 +264,31 @@ Commands (sub-actions of the `setup-instructions` skill):
 Creates or updates:
 
 ```text
-<complex-module>/AGENTS.md
-.agentic/setup/modules/<module-id>.json
+.github/instructions/<module-id>.instructions.md
 ```
 
-### Inputs To Collect Per Module
+The file requires YAML frontmatter with an `applyTo` glob scoped to the module.
+Its body covers purpose, boundaries, differing commands, important paths,
+patterns, pitfalls, and restrictions. Detect these first and present one compact
+draft; ask only about missing or conflicting facts.
 
-Ask these questions:
-
-1. What is this module responsible for?
-2. What should this module not be responsible for?
-3. How do you test or build this module specifically, if different from the root commands?
-4. What are the main entry points or important files?
-5. What patterns should agents follow here?
-6. What are common pitfalls or risky areas?
-7. Are there module-specific restricted files or changes?
-
-### Module AGENTS.md Template
-
-````md
-# AGENTS.md - <Module Name>
-
-## Module Purpose
-
-<what this module is responsible for>
-
-## Boundaries
-
-This module should not handle:
-
-- <non-responsibility>
-
-## Important Files
-
-- `<path>`: <purpose>
-- `<path>`: <purpose>
-
-## Local Commands
-
-Use root commands unless noted otherwise.
-
-- Build/check: `<command or "same as root">`
-- Test: `<command or "same as root">`
-
-## Module Rules
-
-- <pattern/rule>
-- <pattern/rule>
-
-## Risks and Pitfalls
-
-- <pitfall>
-- <risky area>
-
-## Agent Guidance
-
-- Prefer patterns already used in this module.
-- Keep changes inside this module unless the task explicitly requires cross-module work.
-- If a change affects public contracts used elsewhere, call that out before implementation.
-- Do not edit restricted module areas without approval: <restricted areas or "none declared">
-````
+If the lead explicitly requests a cross-agent instruction file, create
+`<module>/AGENTS.md` instead of or alongside the scoped GitHub instruction file.
+Existing files still use the reviewed merge protocol.
 
 ### Module Completion Criteria
 
 A module is complete when:
 
-- `<module>/AGENTS.md` exists;
+- the confirmed scoped instruction artifact exists with valid `applyTo`;
 - the file documents purpose, boundaries, commands, patterns, risks, and restrictions;
-- `.agentic/setup/modules/<module-id>.json` records the module status as complete;
-- the root instruction state no longer marks that module as pending.
+- a new instructions evidence revision removes the module from `pendingModules`.
+
+There is no second module-status file.
 
 ## Status And Help Behavior
 
-`init help` and `init status` should report instruction setup like this:
+`/akmaestro-init help` and `/akmaestro-init status` should report instruction setup like this:
 
 ```text
 Instruction files:

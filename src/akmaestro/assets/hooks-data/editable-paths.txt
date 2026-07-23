@@ -10,4 +10,4 @@
 # Restricted globs (restricted-paths.txt) still apply inside listed paths, so
 # .env, *.pem, secrets/ etc. stay protected in sibling repositories too.
 #
-# Populated during /init from the "workspace & dependencies" interview.
+# Populated during /akmaestro-init from the "workspace & dependencies" interview.

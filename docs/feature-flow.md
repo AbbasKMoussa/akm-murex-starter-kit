@@ -79,11 +79,16 @@ the curation and the clean context, not from any agent primitive.
 ## Prerequisite
 
 `/feature` first checks the committed Stage 1 state. If repository initialization
-is incomplete, only the team lead resumes `/init`. It then runs the local
+is incomplete, only the team lead resumes `/akmaestro-init`. It then runs the local
 readiness probes from committed environment requirements. Missing `uv`,
 Graphifyy, selected LSPs, or graphs block mutation; `/feature` presents the
-structured remediation action and asks before running it. Developers never run
-`/init` for workstation setup.
+structured remediation action and asks before running it. After confirmation it
+passes that exact action to controller-owned `remediation-run --approved`, which
+executes the argument array without a shell and only in a declared writable
+repository. Developers never run `/akmaestro-init` for workstation setup.
+Because `uv` bootstraps the controller itself, a missing uv binary is the sole
+exception: `/feature` offers the official platform installer after explicit
+consent, then stops for a PATH/session refresh before any workflow mutation.
 
 ## Multi-repo workspaces
 
@@ -104,10 +109,14 @@ are declared in `AGENTS.md` (Workspace & Dependencies) with one of two roles:
   constraints. It is never edited; a needed change is recorded in `feature.md`
   as an external dependency for the owning team, never a story.
 
+All sibling graphs are generated under the main repository's gitignored
+`.agentic/local/graphs/` tree. Graph extraction reads a sibling as source and
+never writes generated output into it.
+
 ## Phases and skills
 
 The feature flow ships as an orchestrator plus per-step skills (so each step can
-run in its own context), mirroring `/init` + `/setup-*`.
+run in its own context), mirroring `/akmaestro-init` + `/setup-*`.
 
 | Phase | Skill | Specialist persona | Output |
 | --- | --- | --- | --- |
@@ -194,7 +203,7 @@ evolves.
 ```json
 {
   "$schema": "../../schemas/feature-state.schema.json",
-  "version": 2,
+  "version": 3,
   "revision": 8,
   "featureId": "<id>",
   "title": "…",
@@ -231,15 +240,18 @@ Orientation works from **any point, in a fresh/cold session** — it reads state
 from disk, not conversation history. This is the "where am I?" command, always
 available:
 
+- **`/status`** — universal, read-only orientation. It reports initialization
+  first when setup is incomplete; otherwise it reports readiness and feature
+  progress without changing state.
 - **`/feature`** with no argument, or **`/feature status`** — report where you
   are and the suggested next command.
 - **`/feature help`** — explain the phases, the fresh-context rule, and the gates.
 
-Because it's a skill, this is **auto-discovered from natural language** too — no
-slash command needed. The `/feature` skill's `description` must include trigger
-phrases like "where are we?", "what's the status?", "what's left?", "what should
-I do next?", "resume the feature" so Copilot routes those to it (same mechanism as
-`/teach`). The slash form is just the explicit path.
+Because skills are auto-discovered from natural language, no slash command is
+required. The `/status` description owns unqualified phrases such as "where are
+we?" and "what should I do next?". The `/feature` description owns explicit
+feature phrases such as "where are we on this feature?" and "resume the
+feature", avoiding ambiguous routing. Slash forms remain the explicit path.
 
 `/feature status` runs `feature-list` and `feature-show`, then prints, e.g.:
 
@@ -252,7 +264,7 @@ Next: open a new session and run /story-implement
 
 It handles every situation so the user is never stuck:
 
-- **No feature in progress** → say so and suggest `/feature-understand` to start.
+- **No feature in progress** → say so and suggest `/feature start`.
 - **One feature in progress** → orient as above and select it locally if needed.
 - **Multiple features in progress** → list them with their phase/next-step and ask
   which to resume in this worktree.
@@ -275,7 +287,7 @@ way: feature-id scheme (1a), story sizing + ordering + dependencies (Phase 2,
 S10), what story/feature review checks (Phases 3–4), manual-testing-guide format
 (Phase 4), and primer location — appended to the story file (Phase 3).
 
-All 11 Stage 2 skills and the v2 controller/schemas are bundled by the installer.
+All 11 Stage 2 skills and the v3 controller/schemas are bundled by the installer.
 Automated tests cover legal/illegal transitions, stale revisions, idempotent
 replay, review loops, local readiness, and feature completion. The revised flow
 still needs end-to-end Copilot CLI and VS Code validation, including

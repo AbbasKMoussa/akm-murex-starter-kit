@@ -22,24 +22,27 @@ Goal: confirm `akmaestro init` works on Windows and lays files down correctly.
 
 1. Ensure `uv` is installed (PowerShell):
    ```powershell
-   powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
    ```
 2. Create a scratch folder and install into it:
    ```powershell
    mkdir akm-scratch; cd akm-scratch
+   git init
    uvx --refresh --from git+https://github.com/AbbasKMoussa/akm-murex-starter-kit.git akmaestro init
    ```
 
 **Expected:**
-- Command exits 0 and prints a list of created files ending with "Next: … run /init".
-- `.github\skills\` contains **18** skill folders (each with `SKILL.md`).
+- Command exits 0 and prints a list of created files ending with "Next: … run
+  /akmaestro-init".
+- `.github\skills\` contains **19** skill folders (each with `SKILL.md`).
 - `.github\hooks\scripts\` contains the four `*.ps1` files.
 - `.agentic\hooks\` contains `restricted-paths.txt`, `dangerous-commands.txt`,
   `editable-paths.txt`, `lint-commands.json`.
-- `.agentic\bin\akmaestro-state.py`, `.agentic\STATE-PROTOCOL.md`, and six
+- `.agentic\bin\akmaestro-state.py`, `.agentic\STATE-PROTOCOL.md`, and seven
   `.agentic\schemas\*.json` files exist.
 - `.gitignore` contains `.agentic/local/` and `.agentic/audit/`.
-- `AGENTS.md` was created (placeholder).
+- `AGENTS.md` was created (placeholder); `hooks.json` contains
+  `"disableAllHooks": true` until explicit consent.
 
 Record the skill count and whether each expected path exists.
 
@@ -112,7 +115,8 @@ Get-ChildItem .agentic\audit\*.jsonl | ForEach-Object { Get-Content $_ -Tail 1 }
 
 **Expected:** B10 prints nothing (observational hook) and exits 0; a
 `.agentic\audit\<date>.jsonl` file now exists with one JSON line containing
-`"event":"userPromptSubmitted"` and `"session":"abc"`. This uses the **real**
+`"event":"userPromptSubmitted"` and no prompt text, arguments, result, session
+identifier, or credential content. This uses the **real**
 CLI shape (no `hook_event_name` field), so it verifies the event kind is
 inferred structurally from the presence of `prompt`.
 
@@ -135,13 +139,20 @@ Skip if GitHub Copilot (VS Code or CLI) isn't installed here; note it as skipped
 1. Open Copilot **in a fresh session** at the `akm-scratch` root (skills are only
    discovered in a new session).
 2. Ask: **"where are we / what can you do?"** and check the AKMaestro skills are
-   discoverable (e.g. `/doctor`, `/teach`, `/init`, `/feature`).
+   discoverable (e.g. `/status`, `/doctor`, `/teach`, `/akmaestro-init`, `/feature`). Run
+   `/status` before initialization and confirm it reports setup as not started
+   with `/akmaestro-init` as the next action.
 3. Run **`/doctor`** and capture its health report.
-4. If hooks are enabled on this surface, try an edit to `.env` and to a normal
+4. During `/akmaestro-init`, confirm instructions setup presents one sourced
+   product/command/Git summary, uses argument-array `action-check` for finite
+   commands, writes strict instructions evidence, and leaves no placeholders.
+5. Confirm hooks remain disabled until the lead consents during `/setup-hooks`.
+   After enablement, try an edit to `.env` and to a normal
    file, and note whether the **restricted-path guard** actually fires (deny vs
    allow) in a real session — this verifies the live tool-name/`toolArgs` wiring.
-5. After the team lead completes `/init`, open a fresh developer session and run
-   `/feature` directly. Confirm it never asks the developer to rerun `/init`, and
+6. After the team lead completes `/akmaestro-init`, open a fresh developer session and run
+   `/feature` directly. Confirm it never asks the developer to rerun
+   `/akmaestro-init`, and
    that any missing local requirement is offered as a confirmed structured
    remediation action.
 
@@ -156,7 +167,7 @@ Write `windows-test-results.md` with a table like:
 
 | Test | Expected | Actual | Pass? |
 |------|----------|--------|-------|
-| A: skills installed | 18 | … | |
+| A: skills installed | 19 | … | |
 | B1 .env edit | deny | … | |
 | … | | | |
 

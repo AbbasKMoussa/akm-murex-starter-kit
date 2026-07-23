@@ -1,201 +1,93 @@
 # Initialization Topic: Tooling
 
-This topic defines the second setup step for a target repository.
+`/setup-tooling` is the second mandatory setup topic. It verifies Graphifyy and
+one language server per confirmed project language, then writes the shared
+developer-readiness contract used by `/feature`.
 
-## Goal
+It is also reached through `/akmaestro-init`.
 
-Set up and verify the repo tooling needed for agentic coding:
+## Input
 
-- LSP for the selected project language(s);
-- code indexing through Graphifyy.
+Detect project and sibling-repository languages, then ask the lead to confirm
+the language set. Do not ask for tools already implied by that confirmation.
 
-The step should stay simple. Ask the user only what language(s) they want LSP configured for.
+## Graphifyy
 
-## Command
-
-```text
-/setup-tooling
-```
-
-(Also reachable through the guided `/init`. See `docs/setup-flow.md` for the
-command model.)
-
-## User Input
-
-Ask:
+The package is `graphifyy`; the executable is `graphify`:
 
 ```text
-What language(s) should I set up LSP for?
-```
-
-Then continue with setup.
-
-## Graphifyy Setup
-
-Graphifyy is installed from the official `graphifyy` package. The CLI command is `graphify`.
-
-Install with the required `uv` runtime:
-
-```bash
 uv tool install graphifyy
-```
-
-For VS Code Copilot Chat:
-
-```bash
 graphify vscode install
+graphify extract . --out .agentic/local/graphs/main
+graphify query "what is this repository about?" --graph .agentic/local/graphs/main/graph.json
 ```
 
-Build the repo graph from the repository root:
-
-```bash
-graphify extract .
-```
-
-If `AGENTS.md` declares modifiable or read-only sibling repositories, build a
-graph for each too. A read-only sibling's graph provides high-level
-understanding so the agent opens its code only when a specific behavior matters:
-
-```bash
-(cd ../lib-b && graphify extract .)
-(cd ../vendor-c && graphify extract .)
-```
-
-Expected output:
+Every graph is developer-local and gitignored:
 
 ```text
-graphify-out/
-  graph.html
-  GRAPH_REPORT.md
-  graph.json
+.agentic/local/graphs/<repository-id>/graph.json
 ```
 
-Test Graphifyy:
-
-```bash
-graphify --version
-graphify query "what is this repository about?"
-```
-
-Graphifyy is complete only when the command exists, the graph is generated, and a query runs successfully.
-
-## LSP Setup
-
-Install or verify the language server for the language(s) chosen by the user.
-
-Common mappings:
+For a sibling, pass its path as the extraction source and a path under the main
+repository as `--out`:
 
 ```text
-TypeScript/JavaScript -> typescript-language-server; built-in VS Code support
-                         alone does not satisfy Copilot CLI readiness
-Python -> pyright
-Java -> jdtls with a non-interactive probe
-Go -> gopls
-Rust -> rust-analyzer
-C/C++ -> clangd
-C# -> C# language server or OmniSharp with a non-interactive probe
+graphify extract ../lib-b --out .agentic/local/graphs/lib-b
+graphify extract ../vendor-c --out .agentic/local/graphs/vendor-c
 ```
 
-Test the selected LSP with its version command when available:
+This applies equally to modifiable and read-only siblings. Never create
+`graphify-out/` or any generated artifact inside a sibling repository.
 
-```bash
-pyright --version
-gopls version
-rust-analyzer --version
-clangd --version
-```
+## Language servers
 
-For Java and C#, capture a reliable non-interactive command probe. An IDE-only
-extension check cannot establish readiness for Copilot CLI developers.
+Verify one non-interactive command per confirmed language. Typical choices are
+`typescript-language-server`, `pyright`, `jdtls`, `gopls`, `rust-analyzer`,
+`clangd`, and an appropriate C# language server. An IDE-only extension does not
+satisfy Copilot CLI readiness unless it exposes a reliable command probe.
 
-LSP is complete only when the selected language server is installed/configured and the agent can verify it is available.
+## Requirements contract
 
-## New Session Requirement
+Write `.agentic/setup/environment-requirements.json` through
+`requirements-write`. It contains structured argument-array probes and confirmed
+install/remediation actions for:
 
-After installing Graphifyy or LSP tooling, ask the user to open a new Copilot session at the repository root.
-
-The new session should run:
-
-```text
-/setup-tooling
-```
-
-or:
-
-```text
-init help
-```
-
-This lets the assistant detect newly installed tools, loaded skills, updated PATH values, and any VS Code/Copilot configuration changes.
-
-## Evidence And Shared Requirements
-
-Write detailed evidence through the state controller to:
-
-```text
-.agentic/setup/tooling-state.json
-```
-
-The evidence should include:
-
-- selected language(s);
-- Graphifyy install command used;
+- `uv`;
 - Graphifyy version;
-- graph output path;
-- Graphifyy query test result;
-- selected LSP(s);
-- LSP test command(s);
-- LSP test result(s);
-- whether a new session was requested;
+- a Graphifyy query against the main graph;
+- `lsp-<language>` for every selected language;
+- the main and declared-sibling graph artifacts.
 
-The same step writes committed
-`.agentic/setup/environment-requirements.json` through `requirements-write`.
-It contains structured argument-array probes and confirmed remediation actions
-for required `uv`, `graphify`, each selected `lsp-*`, the main
-`graphify-graph`, and declared sibling graphs. It never contains credentials.
-Topic status exists only in `initialization-state.json` and is changed through
-the controller after evidence and requirements are valid.
+Paths and working directories are repository-relative POSIX paths. Commands are
+argument arrays, never shell strings. Credentials and local command output are
+not committed. Run `readiness-check` after writing requirements.
 
-## Completion Criteria
+## Strict evidence
 
-`/setup-tooling` is complete only when:
+`evidence-write tooling` accepts exactly:
 
-- Graphifyy is installed;
-- Graphifyy has generated `graphify-out/graph.json`;
-- a Graphifyy query test has passed;
-- the selected LSP is installed/configured;
-- the selected LSP has been tested successfully;
-- `.agentic/setup/tooling-state.json` records the successful results.
+- `languages`;
+- `graphify`: `status`, `version`, `queryStatus`, `graphPaths`, and `detail`;
+- `lsps`: exactly one `language`, `toolId`, `status`, and `detail` per language;
+- `requirementsRevision`;
+- `newSessionRequired`;
+- `blockers`.
 
-If either Graphifyy or LSP is missing, untested, or failing because work is
-incomplete, the topic remains `in_progress`.
+Graph paths must match `.agentic/local/graphs/<id>/graph.json`. Evidence must
+reference the current requirements revision.
 
-**Blocked-not-failed escape.** Tooling is mandatory, but if a step genuinely
-cannot be done in this environment (air-gapped repo, no registry access, org
-policy blocking the install) it is recorded as `blocked` — not `failed` or
-`in_progress` — with manual-completion steps in the tooling evidence and
-structured remediation in environment requirements.
-LSP is the floor: when LSP is verified but Graphifyy is environmentally blocked,
-tooling is `blocked` and overall setup may still complete (see
-`docs/setup-flow.md`). `blocked` requires a real environment reason, not a
-skipped or failed step.
+## Completion
 
-## Status And Help Behavior
+Complete only when required local probes and artifacts are ready. A normal
+install/query/LSP failure leaves the topic `in_progress`. A real air-gap,
+registry, or organization-policy restriction is recorded as `blocked` with the
+exact remediation in requirements; overall repository setup may still finalize
+with that durable follow-up.
 
-`init help` and `init status` should report tooling setup like this:
+Request a restart only when the current process cannot observe an installed
+command or Copilot must reload. Persist evidence and requirements first. The
+sole resume instruction is:
 
 ```text
-Tooling:
-- Graphifyy: complete
-- LSP:
-  - Java: complete
-
-Recommended next step:
-- open a new Copilot session at the repo root and run init help
+Next: open a new Copilot session at the repository root and run /akmaestro-init
 ```
-
-If Graphifyy is incomplete, recommend fixing Graphifyy first.
-
-If Graphifyy is complete but LSP is incomplete, recommend fixing the selected LSP.
-
-If both are complete and a new session has not been requested yet, ask the user to open a new Copilot session at the repo root.

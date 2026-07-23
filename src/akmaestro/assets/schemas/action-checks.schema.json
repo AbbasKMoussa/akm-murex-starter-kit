@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://akmaestro.internal/schemas/action-checks.schema.json",
+  "title": "AKMaestro controller-owned instruction action checks",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "version", "revision", "checks", "createdAt", "updatedAt"],
+  "properties": {
+    "$schema": { "const": "../schemas/action-checks.schema.json" },
+    "version": { "const": 3 },
+    "revision": { "type": "integer", "minimum": 0 },
+    "checks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/check" }
+    },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["checkId", "actionHash", "status", "detail", "checkedAt"],
+      "properties": {
+        "checkId": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+        "actionHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "status": { "enum": ["passed", "failed"] },
+        "exitCode": { "type": "integer" },
+        "detail": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "checkedAt": { "type": "string", "format": "date-time" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "passed" } }, "required": ["status"] },
+          "then": { "required": ["exitCode"], "properties": { "exitCode": { "const": 0 } } },
+          "else": { "properties": { "exitCode": { "not": { "const": 0 } } } }
+        }
+      ]
+    }
+  }
+}

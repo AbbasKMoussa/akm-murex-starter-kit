@@ -10,12 +10,13 @@
     "revision",
     "profile",
     "topics",
+    "finalization",
     "createdAt",
     "updatedAt"
   ],
   "properties": {
     "$schema": { "const": "../schemas/setup-state.schema.json" },
-    "version": { "const": 2 },
+    "version": { "const": 3 },
     "revision": { "type": "integer", "minimum": 0 },
     "profile": {
       "type": "object",
@@ -36,6 +37,33 @@
         "skills": { "$ref": "#/$defs/mandatoryTopic" },
         "hooks": { "$ref": "#/$defs/optionalTopic" }
       }
+    },
+    "finalization": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "updatedAt"],
+          "properties": {
+            "status": { "const": "pending" },
+            "previousGuideHash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "updatedAt": { "type": "string", "format": "date-time" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "guideHash", "updatedAt"],
+          "properties": {
+            "status": { "const": "complete" },
+            "guideHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "updatedAt": { "type": "string", "format": "date-time" }
+          }
+        }
+      ]
     },
     "createdAt": { "type": "string", "format": "date-time" },
     "updatedAt": { "type": "string", "format": "date-time" },

@@ -4,23 +4,33 @@
 # STATUS: event inference is regression-tested against captured CLI payloads;
 # live Bash-surface verification remains pending.
 #
-# Never blocks and never influences the agent: emits no decision and ALWAYS
-# exits 0, even on error.
+# Records metadata only: event kind, tool name, and timestamp. Prompt text,
+# tool arguments, tool results, and session identifiers are never persisted.
+# Never blocks or influences the agent and always exits 0, even on error.
 
 set -u
+umask 077
 
 dir=".agentic/audit"
 mkdir -p "$dir" 2>/dev/null || exit 0
+chmod 700 "$dir" 2>/dev/null || true
+# Daily files are sufficient for local diagnostics. Keep at most 14 days.
+find "$dir" -type f -name '*.jsonl' -mtime +14 -exec rm -f -- {} + 2>/dev/null || true
 file="$dir/$(date +%Y-%m-%d 2>/dev/null).jsonl"
 ts="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)"
 
 payload="$(cat 2>/dev/null)" || exit 0
 
 if command -v jq >/dev/null 2>&1; then
-  # The GA CLI sends no explicit event-name field (captured 2026-07-06), so
-  # infer the event kind structurally: a tool call has toolName (+ toolResult
-  # once it has run), a prompt event has `prompt`, a session-end has `reason`.
+  # The GA CLI sends no explicit event-name field, so infer the event kind
+  # structurally. Only bounded, non-content metadata is retained.
   printf '%s' "$payload" | jq -c --arg ts "$ts" '
+    def safe_event:
+      if . == "preToolUse" or . == "postToolUse" or
+         . == "userPromptSubmitted" or . == "sessionEnd"
+      then . else "unknown" end;
+    def safe_tool:
+      if type == "string" and test("^[A-Za-z0-9._:-]{1,128}$") then . else null end;
     {
       received_at: $ts,
       event: (
@@ -29,17 +39,15 @@ if command -v jq >/dev/null 2>&1; then
          elif    has("prompt")   then "userPromptSubmitted"
          elif    has("reason")   then "sessionEnd"
          else    "unknown" end)
+        | safe_event
       ),
-      session: (.sessionId // .session_id // null),
-      tool:    (.toolName // .tool_name // null),
-      raw: .
+      tool: ((.toolName // .tool_name // null) | safe_tool)
     }' >> "$file" 2>/dev/null \
-  || printf '{"received_at":"%s","raw_unparsed":true}\n' "$ts" >> "$file" 2>/dev/null
+  || printf '{"received_at":"%s","event":"unknown","parse_error":true}\n' "$ts" >> "$file" 2>/dev/null
 else
-  # No jq: escape the payload into a JSON string by hand (strip control chars,
-  # escape backslash and quote) so every trail line is still valid JSON.
-  escaped="$(printf '%s' "$payload" | tr -d '\000-\037' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
-  printf '{"received_at":"%s","raw_escaped":"%s"}\n' "$ts" "$escaped" >> "$file" 2>/dev/null
+  printf '{"received_at":"%s","event":"unknown","parser_unavailable":true}\n' "$ts" >> "$file" 2>/dev/null
 fi
+
+chmod 600 "$file" 2>/dev/null || true
 
 exit 0

@@ -18,10 +18,10 @@
 #      .agentic/hooks/restricted-paths.txt is denied. Applied to in-repo paths
 #      AND inside modifiable siblings (so .env, *.pem etc. stay protected there).
 #
-# SAFETY: preToolUse command hooks are fail-closed (a non-zero exit denies ALL
-# tool calls). Therefore this script ALWAYS exits 0 and defaults to "allow" on
-# ANY parsing uncertainty. It denies only on a positive match: a restricted glob,
-# or a path that positively resolves outside the declared workspace.
+# SAFETY: preToolUse command hooks are fail-closed (a non-zero exit denies all
+# tool calls). This script always exits 0. It allows malformed/unknown payloads,
+# but once an edit path is parsed it must be canonically resolvable and inside a
+# declared writable root. Existing symlinks are resolved before boundary checks.
 
 set -u
 set -f  # no pathname expansion; [[ == pattern ]] matching is unaffected
@@ -47,9 +47,6 @@ path="$(printf '%s' "$payload" | jq -r '
 
 path="${path#./}"
 
-# Textually normalize to an absolute path, resolving '.' and '..' (bash 3.2
-# compatible; no realpath dependency). Symlinks are not resolved — acceptable,
-# since a wrong denial is recoverable and this guard must never hard-fail.
 normalize() {
   local p="$1" out='' seg
   case "$p" in /*) ;; *) p="$PWD/$p" ;; esac
@@ -62,6 +59,33 @@ normalize() {
     esac
   done
   printf '%s' "${out:-/}"
+}
+
+# Resolve symlinks in the existing portion of a path and preserve a potentially
+# non-existent suffix for create operations. realpath is used when available;
+# the fallback resolves physical parent directories and rejects a final symlink
+# it cannot safely resolve.
+canonicalize() {
+  local full probe suffix='' name parent resolved
+  full="$(normalize "$1")" || return 1
+  probe="$full"
+  while [ ! -e "$probe" ] && [ ! -L "$probe" ]; do
+    [ "$probe" = "/" ] && break
+    name="${probe##*/}"
+    suffix="/$name$suffix"
+    probe="${probe%/*}"; [ -n "$probe" ] || probe="/"
+  done
+  if command -v realpath >/dev/null 2>&1; then
+    resolved="$(realpath "$probe" 2>/dev/null)" || return 1
+  elif [ -L "$probe" ]; then
+    return 1
+  elif [ -d "$probe" ]; then
+    resolved="$(cd -P -- "$probe" 2>/dev/null && pwd -P)" || return 1
+  else
+    parent="$(cd -P -- "${probe%/*}" 2>/dev/null && pwd -P)" || return 1
+    resolved="$parent/${probe##*/}"
+  fi
+  printf '%s%s' "${resolved%/}" "$suffix"
 }
 
 # Deny if $1 (a path relative to its repository root) matches a restricted
@@ -85,8 +109,9 @@ check_restricted_globs() {
   done < "$globs_file"
 }
 
-root="$(normalize "$PWD")" || allow
-abs="$(normalize "$path")" || allow
+case "$path" in *$'\n'*|*$'\r'*) deny "Edit path contains unsupported control characters.";; esac
+root="$(canonicalize "$PWD")" || allow
+abs="$(canonicalize "$path")" || deny "Edit to '$path' is blocked because its canonical path could not be resolved safely."
 
 # Inside the repository: apply the restricted globs to the repo-relative path.
 if [ "$abs" = "$root" ] || [[ "$abs" == "$root"/* ]]; then
@@ -102,7 +127,7 @@ if [ -f "$edits_file" ]; then
   while IFS= read -r entry || [ -n "$entry" ]; do
     case "$entry" in ''|\#*) continue;; esac
     entry="${entry%$'\r'}"
-    base="$(normalize "$entry")"
+    base="$(canonicalize "$entry")" || continue
     [ "$base" = "/" ] && continue   # never treat the filesystem root as modifiable
     if [ "$abs" = "$base" ] || [[ "$abs" == "$base"/* ]]; then
       rel="${abs#"$base"/}"

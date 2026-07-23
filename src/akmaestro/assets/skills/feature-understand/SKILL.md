@@ -20,7 +20,8 @@ default** and hunt for what's missing. No solutioning here.
 
 Fresh context. Read `.agentic/STATE-PROTOCOL.md`, run `setup-status`, then run
 `readiness-check`. If required local items are missing, follow the confirmed
-remediation procedure in `/feature`; never send a developer through `/init`.
+remediation procedure in `/feature`; never send a developer through
+`/akmaestro-init`.
 
 Run `feature-list`. If starting a feature, ask for a short title and optional
 ticket id, derive `feature-id`, and call `feature-create`. If resuming among

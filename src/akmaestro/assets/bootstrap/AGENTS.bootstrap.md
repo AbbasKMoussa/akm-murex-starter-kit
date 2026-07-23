@@ -1,13 +1,21 @@
 # AGENTS.md
 
-> This is a placeholder created by AKMaestro. The team lead runs `/init` once to
+> This is a placeholder created by AKMaestro. The team lead runs `/akmaestro-init` once to
 > replace it with real, repo-specific instructions and commits the result. Other
 > developers start with `/feature`; the `setup-instructions` skill fills in the
 > sections below from detected facts and the lead's answers.
 
 ## Product
 
-<team lead: run `/init` to fill in what this product is and does>
+<team lead: run `/akmaestro-init` to fill in what this product is and does>
+
+## Repository Context
+
+<main repository or role in a wider system>
+
+## Setup
+
+<dependency/bootstrap actions, or an explicit not-applicable reason>
 
 ## Build
 
@@ -27,10 +35,22 @@
 
 ## Workspace & Dependencies
 
-<team lead: run `/init` to fill in locally checked-out sibling repositories, each marked
+<team lead: run `/akmaestro-init` to fill in locally checked-out sibling repositories, each marked
 **modifiable** (we own it — may be changed as part of work here, following its
 own AGENTS.md) or **read-only** (consult only; never edit; a needed change there
 is an external dependency to surface)>
+
+## CI
+
+<CI system and required checks>
+
+## Complex Modules
+
+<module paths needing scoped instructions, or none>
+
+## Git Workflow
+
+<base branch and explicit branch, commit, push, PR, signing, and ticket policies>
 
 ## Agent Rules
 

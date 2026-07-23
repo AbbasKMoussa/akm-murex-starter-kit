@@ -4,17 +4,17 @@ build-backend = "hatchling.build"
 
 [project]
 name = "akmaestro"
-version = "0.5.0"
+version = "0.6.0"
 description = "AKMaestro — conduct your agentic coding: set up a repo for GitHub Copilot (VS Code + CLI) and drive features with a guided flow."
 readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "Proprietary" }
+license = { file = "LICENSE" }
 
 [project.scripts]
 akmaestro = "akmaestro.cli:main"
 
 [dependency-groups]
-dev = ["jsonschema>=4.23", "pytest>=8"]
+dev = ["jsonschema>=4.23", "pytest>=8", "ruff>=0.15"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/akmaestro"]

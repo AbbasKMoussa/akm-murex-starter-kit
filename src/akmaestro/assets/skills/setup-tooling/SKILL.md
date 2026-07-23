@@ -4,9 +4,7 @@ description: >-
   Set up and verify the tooling needed for agentic coding in this repo — a
   language server (LSP) for the chosen language(s) and Graphifyy code indexing.
   Use for "/setup-tooling", "set up tooling/LSP/Graphifyy", or the tooling step
-  of /init. Not complete until the tools are installed AND tested.
-allowed-tools:
-  - shell
+  of /akmaestro-init. Not complete until the tools are installed AND tested.
 ---
 
 # setup-tooling — LSP + Graphifyy
@@ -28,35 +26,51 @@ languages; the user confirms.)
 
 ## Graphifyy
 
-Install with the repository-standard `uv` runtime:
+The required actions are:
 
 ```bash
 uv tool install graphifyy
 graphify vscode install     # for VS Code Copilot Chat
-graphify extract .          # build the graph from the repo root
+graphify extract . --out .agentic/local/graphs/main
 ```
 
-Expected output under `graphify-out/` (`graph.json`, `graph.html`,
-`GRAPH_REPORT.md`). Test:
+Do not run machine-changing snippets directly. First record confirmed install
+and extraction argument arrays in environment requirements as described below,
+run `readiness-check`, show each missing item and exact action, and ask for
+confirmation. After confirmation, write that exact action object to a local file
+and pass it to `remediation-run --input <file> --approved`. The controller
+rejects actions not present in the committed requirements and never invokes a
+shell. Rerun readiness after each action. The optional VS Code integration
+command may instead use confirmed shell-free `action-check` because it is not a
+cross-surface developer requirement.
+
+Graphs are developer-local generated artifacts. Keep every graph under
+`.agentic/local/graphs/`; never create `graphify-out/` in the main or a sibling
+repository, and never commit graph output. Expected main output includes
+`.agentic/local/graphs/main/graph.json`. Test:
 
 ```bash
 graphify --version
-graphify query "what is this repository about?"
+graphify query "what is this repository about?" --graph .agentic/local/graphs/main/graph.json
 ```
+
+Use the same `--graph <path>/graph.json` argument for each cached graph. Do not
+fall back to moving or copying generated output into a source repository.
 
 ### Sibling repositories
 
-If `AGENTS.md` declares modifiable or read-only sibling repositories, index them
-too — reading across the workspace is the whole point of declaring them:
+If `AGENTS.md` declares modifiable or read-only sibling repositories, index their
+source into the main repository's local graph cache:
 
 ```bash
-(cd ../lib-b && graphify extract .)      # modifiable sibling repository
-(cd ../vendor-c && graphify extract .)   # read-only sibling repository
+graphify extract ../lib-b --out .agentic/local/graphs/lib-b
+graphify extract ../vendor-c --out .agentic/local/graphs/vendor-c
 ```
 
-Verify each produces its own `graphify-out/graph.json` and answers a query.
-Read-only sibling repositories are indexed exactly like modifiable ones — the
-boundary guard, not the tooling, is what prevents edits there.
+Verify each produces `.agentic/local/graphs/<repo-id>/graph.json` and answers a
+query using `--graph` with that exact path. The
+source repository is read only during extraction. **Never write any file or
+generated directory inside a read-only sibling repository.**
 
 ## LSP
 
@@ -85,9 +99,16 @@ overall setup may still complete.
 
 ## New session
 
-After installing tooling, ask the user to open a new Copilot session at the repo
-root so new PATH entries / VS Code config are picked up, then re-run
-`/setup-tooling` or `init status` to confirm.
+Restart only when the current process cannot observe a newly installed command or
+the current Copilot surface requires it. Persist evidence and requirements first,
+leave tooling `in_progress`, and use exactly this handoff:
+
+```text
+Next: open a new Copilot session at the repository root and run /akmaestro-init
+```
+
+Do not request a second restart merely because a graph was regenerated or VS
+Code automatically reloaded configuration.
 
 ## State
 
@@ -96,6 +117,31 @@ command, version, graph paths, and query results; selected LSPs and probe result
 and whether a new session was requested. Write it with `evidence-write tooling`.
 The resulting committed `.agentic/setup/tooling-state.json` has no independent
 topic status.
+
+Use exactly this evidence shape, replacing every value with actual results:
+
+```json
+{
+  "languages": ["Python"],
+  "graphify": {
+    "status": "verified",
+    "version": "<observed version>",
+    "queryStatus": "passed",
+    "graphPaths": [".agentic/local/graphs/main/graph.json"],
+    "detail": "Version, extraction, and targeted query passed"
+  },
+  "lsps": [
+    {"language": "Python", "toolId": "lsp-python", "status": "verified", "detail": "pyright --version passed"}
+  ],
+  "requirementsRevision": 0,
+  "newSessionRequired": false,
+  "blockers": []
+}
+```
+
+For a blocked Graphifyy or LSP, use `blocked` in the matching result, keep the
+expected local graph path, add the concise blocker string, and ensure the
+requirements file carries the exact remediation action.
 
 Also create a local JSON input containing `tools` and `artifacts`, then run
 `requirements-write`. The committed
@@ -106,11 +152,13 @@ Also create a local JSON input containing `tools` and `artifacts`, then run
 - `graphify-query`, probed with a real `graphify query` in the main repo;
 - one `lsp-<language>` tool per selected language, each with a non-interactive
   probe and confirmed install command;
-- artifact id `graphify-graph` at `graphify-out/graph.json`, with remediation
-  action `graphify extract .`;
+- artifact id `graphify-graph` at
+  `.agentic/local/graphs/main/graph.json`, with remediation action
+  `graphify extract . --out .agentic/local/graphs/main`;
 - required graph artifacts for declared sibling repositories, using their
-  repository-relative `../<sibling>/graphify-out/graph.json` paths, plus a
-  required query probe whose `cwd` is that sibling path.
+  `.agentic/local/graphs/<repo-id>/graph.json` paths in the main repository, plus
+  a required query probe that explicitly targets the cached graph. Extraction
+  takes the sibling as a source argument and writes only under `.agentic/local/`.
 
 Represent probe and remediation commands as argument arrays with an optional
 repository-relative `cwd`, never as shell strings. This prevents command
@@ -121,11 +169,11 @@ separator injection. Never include credentials. Example input fragment:
   "tools": [
     {"id":"uv","label":"uv","required":true,"probe":{"command":["uv","--version"]}},
     {"id":"graphify","label":"Graphifyy","required":true,"probe":{"command":["graphify","--version"]},"install":{"command":["uv","tool","install","graphifyy"]}},
-    {"id":"graphify-query","label":"Graphifyy query","required":true,"probe":{"command":["graphify","query","what is this repository about?"],"cwd":".","timeoutSeconds":60}},
+    {"id":"graphify-query","label":"Graphifyy query","required":true,"probe":{"command":["graphify","query","what is this repository about?","--graph",".agentic/local/graphs/main/graph.json"],"cwd":".","timeoutSeconds":60}},
     {"id":"lsp-python","label":"Pyright","required":true,"probe":{"command":["pyright","--version"]},"install":{"command":["npm","install","--global","pyright"]}}
   ],
   "artifacts": [
-    {"id":"graphify-graph","path":"graphify-out/graph.json","required":true,"remediation":{"command":["graphify","extract","."],"cwd":"."}}
+    {"id":"graphify-graph","path":".agentic/local/graphs/main/graph.json","required":true,"remediation":{"command":["graphify","extract",".","--out",".agentic/local/graphs/main"],"cwd":"."}}
   ]
 }
 ```
@@ -136,7 +184,7 @@ guessing.
 
 ## Completion
 
-Complete only when Graphifyy is installed, has generated `graphify-out/graph.json`,
+Complete only when Graphifyy is installed, has generated the required local graphs,
 and a query passed; the selected LSP is installed and tested; and evidence plus
 environment requirements are recorded. A genuine environment block counts as
 `blocked`, not incomplete.
@@ -145,4 +193,5 @@ Write evidence and requirements first. Then transition `tooling` from
 `in_progress` to `complete`, or to `blocked --reason <reason>` for a genuine
 environment/policy blocker. Pass the latest aggregate `--expected-revision`.
 Unfinished or failed-but-retryable work remains `in_progress`. Rerun
-`setup-status` and report its derived next command.
+`setup-status` and return to the orchestrator. The only cross-session resume
+command is `/akmaestro-init`.

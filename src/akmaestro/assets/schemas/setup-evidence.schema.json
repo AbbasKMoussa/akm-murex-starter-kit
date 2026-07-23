@@ -14,14 +14,780 @@
     "updatedAt"
   ],
   "properties": {
-    "$schema": { "const": "../schemas/setup-evidence.schema.json" },
-    "version": { "const": 2 },
-    "revision": { "type": "integer", "minimum": 0 },
-    "topic": {
-      "enum": ["instructions", "tooling", "skills", "hooks"]
+    "$schema": {
+      "const": "../schemas/setup-evidence.schema.json"
     },
-    "evidence": { "type": "object" },
-    "createdAt": { "type": "string", "format": "date-time" },
-    "updatedAt": { "type": "string", "format": "date-time" }
+    "version": {
+      "const": 3
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "topic": {
+      "enum": [
+        "instructions",
+        "tooling",
+        "skills",
+        "hooks"
+      ]
+    },
+    "evidence": {
+      "type": "object"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "topic": {
+            "const": "instructions"
+          }
+        },
+        "required": [
+          "topic"
+        ]
+      },
+      "then": {
+        "properties": {
+          "evidence": {
+            "$ref": "#/$defs/instructionsEvidence"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "topic": { "const": "tooling" } },
+        "required": ["topic"]
+      },
+      "then": { "properties": { "evidence": { "$ref": "#/$defs/toolingEvidence" } } }
+    },
+    {
+      "if": {
+        "properties": { "topic": { "const": "skills" } },
+        "required": ["topic"]
+      },
+      "then": { "properties": { "evidence": { "$ref": "#/$defs/skillsEvidence" } } }
+    },
+    {
+      "if": {
+        "properties": { "topic": { "const": "hooks" } },
+        "required": ["topic"]
+      },
+      "then": { "properties": { "evidence": { "$ref": "#/$defs/hooksEvidence" } } }
+    }
+  ],
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "nonEmptyStringArray": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/nonEmptyString"
+      }
+    },
+    "optionalStringArray": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/nonEmptyString"
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command"
+      ],
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "command": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        },
+        "cwd": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600
+        }
+      }
+    },
+    "commandDefinition": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "actions",
+            "sources"
+          ],
+          "properties": {
+            "status": {
+              "const": "configured"
+            },
+            "actions": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/action"
+              }
+            },
+            "sources": {
+              "$ref": "#/$defs/nonEmptyStringArray"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "reason",
+            "sources"
+          ],
+          "properties": {
+            "status": {
+              "const": "not_applicable"
+            },
+            "reason": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "sources": {
+              "$ref": "#/$defs/nonEmptyStringArray"
+            }
+          }
+        }
+      ]
+    },
+    "actionCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "checkId",
+        "actionHash",
+        "status",
+        "detail",
+        "checkedAt"
+      ],
+      "properties": {
+        "checkId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$"
+        },
+        "actionHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed"
+          ]
+        },
+        "exitCode": {
+          "type": "integer"
+        },
+        "detail": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "checkedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "passed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "exitCode"
+            ],
+            "properties": {
+              "exitCode": {
+                "const": 0
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "exitCode": {
+                "not": {
+                  "const": 0
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "commandResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "detail",
+        "checks"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "passed",
+            "blocked",
+            "documented",
+            "not_applicable"
+          ]
+        },
+        "detail": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "checks": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/actionCheck"
+          }
+        }
+      }
+    },
+    "manualVerification": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "steps",
+            "sources"
+          ],
+          "properties": {
+            "status": {
+              "const": "configured"
+            },
+            "steps": {
+              "$ref": "#/$defs/nonEmptyStringArray"
+            },
+            "sources": {
+              "$ref": "#/$defs/nonEmptyStringArray"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "reason",
+            "sources"
+          ],
+          "properties": {
+            "status": {
+              "const": "not_applicable"
+            },
+            "reason": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "sources": {
+              "$ref": "#/$defs/nonEmptyStringArray"
+            }
+          }
+        }
+      ]
+    },
+    "policy": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "value",
+            "sources"
+          ],
+          "properties": {
+            "status": {
+              "const": "defined"
+            },
+            "value": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "sources": {
+              "$ref": "#/$defs/nonEmptyStringArray"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "reason",
+            "sources"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "none",
+                "unspecified"
+              ]
+            },
+            "reason": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "sources": {
+              "$ref": "#/$defs/nonEmptyStringArray"
+            }
+          }
+        }
+      ]
+    },
+    "module": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "purpose"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "purpose": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "siblingRepository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "purpose"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "role": {
+          "enum": [
+            "modifiable",
+            "read-only"
+          ]
+        },
+        "purpose": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "integration": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "modifiable"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "then": {
+            "required": [
+              "integration"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "integration"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "toolingEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "languages", "graphify", "lsps", "requirementsRevision",
+        "newSessionRequired", "blockers"
+      ],
+      "properties": {
+        "languages": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonEmptyString" }
+        },
+        "graphify": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "version", "queryStatus", "graphPaths", "detail"],
+          "properties": {
+            "status": { "enum": ["verified", "blocked"] },
+            "version": { "$ref": "#/$defs/nonEmptyString" },
+            "queryStatus": { "enum": ["passed", "blocked"] },
+            "graphPaths": {
+              "type": "array", "minItems": 1, "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^\\.agentic/local/graphs/[^/]+/graph\\.json$"
+              }
+            },
+            "detail": { "$ref": "#/$defs/nonEmptyString" }
+          }
+        },
+        "lsps": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["language", "toolId", "status", "detail"],
+            "properties": {
+              "language": { "$ref": "#/$defs/nonEmptyString" },
+              "toolId": { "type": "string", "pattern": "^lsp-[a-z0-9][a-z0-9-]{0,99}$" },
+              "status": { "enum": ["verified", "blocked"] },
+              "detail": { "$ref": "#/$defs/nonEmptyString" }
+            }
+          }
+        },
+        "requirementsRevision": { "type": "integer", "minimum": 0 },
+        "newSessionRequired": { "type": "boolean" },
+        "blockers": { "$ref": "#/$defs/optionalStringArray" }
+      }
+    },
+    "skillsEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kitVersion", "expectedSkills", "verifiedSkills", "collisions",
+        "discovery", "newSessionRequired", "blockers"
+      ],
+      "properties": {
+        "kitVersion": { "$ref": "#/$defs/nonEmptyString" },
+        "expectedSkills": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonEmptyString" }
+        },
+        "verifiedSkills": {
+          "type": "array", "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonEmptyString" }
+        },
+        "collisions": { "$ref": "#/$defs/optionalStringArray" },
+        "discovery": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["copilotCli", "vsCode"],
+          "properties": {
+            "copilotCli": { "enum": ["verified", "blocked", "not_tested"] },
+            "vsCode": { "enum": ["verified", "blocked", "not_tested"] }
+          }
+        },
+        "newSessionRequired": { "type": "boolean" },
+        "blockers": { "$ref": "#/$defs/optionalStringArray" }
+      }
+    },
+    "hooksEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled", "selectedHooks", "configPath", "checks",
+        "verifiedSurfaces", "blockers"
+      ],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "selectedHooks": { "$ref": "#/$defs/optionalStringArray" },
+        "configPath": { "$ref": "#/$defs/nonEmptyString" },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "status", "detail"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,99}$" },
+              "status": { "enum": ["passed", "failed", "blocked"] },
+              "detail": { "$ref": "#/$defs/nonEmptyString" }
+            }
+          }
+        },
+        "verifiedSurfaces": { "$ref": "#/$defs/optionalStringArray" },
+        "blockers": { "$ref": "#/$defs/optionalStringArray" }
+      }
+    },
+    "instructionsEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "product",
+        "commands",
+        "commandResults",
+        "manualVerification",
+        "gitWorkflow",
+        "repositoryContext",
+        "generatedFiles",
+        "pendingModules"
+      ],
+      "properties": {
+        "product": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "summary",
+            "consumers",
+            "primaryWorkflows",
+            "sources"
+          ],
+          "properties": {
+            "summary": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "consumers": {
+              "$ref": "#/$defs/nonEmptyStringArray"
+            },
+            "primaryWorkflows": {
+              "$ref": "#/$defs/nonEmptyStringArray"
+            },
+            "sources": {
+              "$ref": "#/$defs/nonEmptyStringArray"
+            }
+          }
+        },
+        "commands": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "bootstrap",
+            "build",
+            "test",
+            "lint",
+            "typecheck",
+            "run",
+            "verify"
+          ],
+          "properties": {
+            "bootstrap": {
+              "$ref": "#/$defs/commandDefinition"
+            },
+            "build": {
+              "$ref": "#/$defs/commandDefinition"
+            },
+            "test": {
+              "$ref": "#/$defs/commandDefinition"
+            },
+            "lint": {
+              "$ref": "#/$defs/commandDefinition"
+            },
+            "typecheck": {
+              "$ref": "#/$defs/commandDefinition"
+            },
+            "run": {
+              "$ref": "#/$defs/commandDefinition"
+            },
+            "verify": {
+              "$ref": "#/$defs/commandDefinition"
+            }
+          }
+        },
+        "commandResults": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "bootstrap",
+            "build",
+            "test",
+            "lint",
+            "typecheck",
+            "run",
+            "verify"
+          ],
+          "properties": {
+            "bootstrap": {
+              "$ref": "#/$defs/commandResult"
+            },
+            "build": {
+              "$ref": "#/$defs/commandResult"
+            },
+            "test": {
+              "$ref": "#/$defs/commandResult"
+            },
+            "lint": {
+              "$ref": "#/$defs/commandResult"
+            },
+            "typecheck": {
+              "$ref": "#/$defs/commandResult"
+            },
+            "run": {
+              "$ref": "#/$defs/commandResult"
+            },
+            "verify": {
+              "$ref": "#/$defs/commandResult"
+            }
+          }
+        },
+        "manualVerification": {
+          "$ref": "#/$defs/manualVerification"
+        },
+        "gitWorkflow": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "baseBranch",
+            "policies",
+            "sources"
+          ],
+          "properties": {
+            "baseBranch": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "policies": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "branchNaming",
+                "commitStyle",
+                "directPush",
+                "pullRequests",
+                "commitSigning",
+                "ticketReferences"
+              ],
+              "properties": {
+                "branchNaming": {
+                  "$ref": "#/$defs/policy"
+                },
+                "commitStyle": {
+                  "$ref": "#/$defs/policy"
+                },
+                "directPush": {
+                  "$ref": "#/$defs/policy"
+                },
+                "pullRequests": {
+                  "$ref": "#/$defs/policy"
+                },
+                "commitSigning": {
+                  "$ref": "#/$defs/policy"
+                },
+                "ticketReferences": {
+                  "$ref": "#/$defs/policy"
+                }
+              }
+            },
+            "sources": {
+              "$ref": "#/$defs/nonEmptyStringArray"
+            }
+          }
+        },
+        "repositoryContext": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ciNotes",
+            "complexModules",
+            "siblingRepositories",
+            "restrictedPaths"
+          ],
+          "properties": {
+            "ciNotes": {
+              "$ref": "#/$defs/optionalStringArray"
+            },
+            "complexModules": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/module"
+              }
+            },
+            "siblingRepositories": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/siblingRepository"
+              }
+            },
+            "restrictedPaths": {
+              "$ref": "#/$defs/optionalStringArray"
+            }
+          }
+        },
+        "generatedFiles": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        },
+        "pendingModules": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        }
+      },
+      "anyOf": [
+        {
+          "properties": {
+            "commands": {
+              "properties": {
+                "verify": {
+                  "properties": {
+                    "status": {
+                      "const": "configured"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "properties": {
+            "manualVerification": {
+              "properties": {
+                "status": {
+                  "const": "configured"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            }
+          }
+        }
+      ]
+    }
   }
 }

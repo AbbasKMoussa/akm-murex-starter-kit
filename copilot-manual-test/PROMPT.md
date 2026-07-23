@@ -1,184 +1,156 @@
-# AKMaestro — Live Copilot Verification Prompt
+# AKMaestro Live Copilot Verification
 
-> **For the agent:** You are verifying **AKMaestro** in a live GitHub Copilot
-> session — the one environment its automated tests cannot reach. Work through
-> the phases in order with the human. For each numbered check, compare against
-> the **Expected** result and record PASS / FAIL / SKIPPED. At the end, write
-> `copilot-test-results.md` at the repo root with the results table, the
-> captured audit-payload samples, and a summary. **Observe and report — do not
-> fix failures**, and stay inside this scratch repository at all times.
+You are verifying AKMaestro in a live GitHub Copilot session. Work through the
+checks with the human in order. Record PASS, FAIL, or SKIPPED with the actual
+result. Observe and report; do not repair failures unless asked. Stay inside the
+scratch repository and its explicitly declared modifiable siblings.
 
-AKMaestro lets a team lead initialize a repo once (`/init`), then lets every
-developer start directly with `/feature`. `/feature` checks developer-local
-readiness and offers confirmed remediation. The kit was installed into this
-scratch repo with `akmaestro init`. Its guard hooks read a JSON event on stdin
-and print a decision on stdout. Copilot CLI 1.0.68 on Windows sent `toolArgs` as
-a JSON-encoded string; the scripts now decode that shape and retain defensive
-fallbacks. This run must confirm the fixed deny paths fire live and capture the
-payload again in case the surface contract moved.
+Write `copilot-test-results.md` at the end. Record the OS, Copilot surface and
+version, AKMaestro version, and whether `jq`, `pwsh`, and `uv` are available.
+Never put raw prompts, tool arguments/results, credentials, or session IDs in
+the report.
 
-Record up front: OS, Copilot surface (VS Code or CLI) and its version, and
-whether `jq` is on PATH (`jq --version`).
+AKMaestro has two stages: a team lead runs `/akmaestro-init` once and commits the
+shared result; developers start directly with `/feature`, which checks and
+offers to remediate local prerequisites.
 
----
+## Phase 0: Installed layout
 
-## Phase 0 — Installed layout (shell checks)
+1. Confirm `.github/skills/` contains exactly 19 skill folders with `SKILL.md`.
+   The setup entry is `akmaestro-init`; there must be no bundled `init` skill.
+2. Confirm `.agentic/bin/akmaestro-state.py`, `.agentic/STATE-PROTOCOL.md`, and
+   seven schemas exist, including `action-checks.schema.json`.
+3. Confirm hook scripts/data exist when installed, `.agentic/local/` and
+   `.agentic/audit/` are ignored, and `hooks.json` has `disableAllHooks: true`.
+4. Run `akmaestro update --dry-run` from the installed source. Confirm it writes
+   nothing and reports the proposed result.
 
-1. `.github/skills/` contains **18** skill folders, each with a `SKILL.md`.
-2. `.github/hooks/hooks.json` exists; `.github/hooks/scripts/` has 4 `.sh` + 4
-   `.ps1` files; on macOS/Linux the `.sh` files are executable.
-3. `.agentic/hooks/` has `restricted-paths.txt`, `dangerous-commands.txt`,
-   `editable-paths.txt`, `lint-commands.json`; `.agentic/setup/kit-manifest.json`
-   exists.
-4. `.agentic/bin/akmaestro-state.py`, `.agentic/STATE-PROTOCOL.md`, and six
-   schemas exist.
-5. `AGENTS.md` exists (placeholder) and `.gitignore` contains both
-   `.agentic/local/` and `.agentic/audit/`.
+Expected: all assets are present; hooks are disabled before consent.
 
-**Expected:** all present. Record the actual skill count.
+## Phase 1: Discovery and read-only orientation
 
-## Phase 1 — Skill discovery
+5. Confirm these entry skills are discoverable: `status`, `akmaestro-init`,
+   `setup-instructions`, `setup-tooling`, `setup-skills`, `setup-hooks`, `teach`,
+   `doctor`, `feature`, and the eleven feature-step skills.
+6. Run `/status` before setup. It must name the team lead as owner, give
+   `/akmaestro-init` as the one next action, and create no setup state.
+7. Ask “is the agentic setup healthy?” Confirm natural-language routing invokes
+   `/doctor` and produces a grouped diagnosis without crashing.
 
-In *this* session, check which kit skills are discoverable/invocable: `init`,
-`setup-instructions`, `setup-tooling`, `setup-skills`, `setup-hooks`, `teach`,
-`doctor`, `feature`, `feature-understand`, `feature-frame`, `feature-split`,
-`story-prime`, `story-plan`, `story-implement`, `story-review`, `story-learn`,
-`feature-review`, `feature-retro`.
+## Phase 2: Team-lead initialization
 
-6. Are they visible as slash commands (or listed as available skills)?
-7. Does plain natural language route correctly — say nothing but
-   *"is the agentic setup healthy?"* and see whether the **doctor** skill is
-   picked up.
+8. Run `/akmaestro-init`. Confirm it reads and follows each installed topic skill
+   in controller order without requiring manual topic invocation.
+9. During instructions setup, confirm the agent presents one sourced matrix for:
+   product purpose/consumers/workflows; bootstrap, build, test, lint, typecheck,
+   run, and verify; branch and commit conventions; restricted paths; complex
+   modules; and sibling repository roles. It should ask only about gaps,
+   conflicts, and low-confidence proposals.
+10. Confirm finite configured actions are represented as argument arrays, shown
+    before execution, run through `action-check`, and written with the exact
+    controller `checkId`. Machine-changing bootstrap requires confirmation.
+11. Confirm existing instruction files use `merge-plan`, show the exact unified
+    diff, and require confirmation before `merge-apply --approved`. Change a
+    target after reviewing one test plan and confirm application is rejected.
+12. Confirm Graphifyy writes every graph under
+    `.agentic/local/graphs/<repository-id>/graph.json`, including sibling-source
+    graphs. It must not write output into a read-only sibling.
+13. Confirm skill evidence lists all 19 skills and discovery results for the
+    surfaces actually tested.
+14. In hooks setup, confirm assets remain disabled during explanation and dry
+    tests. Declining must leave them disabled and skip the topic. If enabling,
+    explicit consent must precede `hooks-enable`.
+15. Interrupt once after an artifact/evidence write but before its aggregate
+    transition. Start a fresh session, run `/akmaestro-init`, and confirm it
+    resumes without corruption or duplicate advancement.
+16. Confirm setup state is version 3, has revisions and finalization, and does
+    not persist derived `overall`, `currentStep`, or `nextCommand` fields.
+17. On completion, confirm `setup-finalize` writes `.github/AGENTIC.md`, returns
+    exact shared/local/blocked/pending inventories, and rerunning is idempotent.
+    If an existing test guide must be replaced, confirm `setup-finalize
+    --preview` returns the exact diff without changing the guide or state, and
+    replacement occurs only after explicit approval.
+    No generated guide or root instruction file may retain a placeholder.
 
-**Expected:** all 18 discoverable; natural language triggers doctor. Record any
-missing names and how discovery presents them on this surface.
+Expected: setup is controller-driven, resumable, non-destructive, and ends with
+a review-and-commit handoff. A genuine policy/environment block may be recorded;
+an ordinary failed command must remain unfinished.
 
-## Phase 2 — /doctor
+## Phase 3: Hook scripts while disabled
 
-8. Run `/doctor` and capture its report verbatim.
+Skip hook checks when assets were omitted. Directly invoke the platform scripts
+with the GA CLI shape, where `toolArgs` is a JSON-encoded string:
 
-**Expected:** a grouped ok/warn/fail report that reaches a verdict without
-crashing. Before `/init`, missing initialization/environment requirements are
-expected failures; note anything else that looks wrong.
+18. Restricted guard: `.env` -> deny; `README.md` -> allow; undeclared sibling
+    -> deny; declared modifiable sibling -> allow; `.env` inside that sibling ->
+    deny; a symlink or junction escape -> deny.
+19. Dangerous-command guard: a harmless sentinel pattern -> deny when matched;
+    a normal listing command -> allow; dangerous text in file content -> allow.
+20. Lint hook: configure a temporary structured linter and use a filename with
+    spaces and shell metacharacters. Confirm direct execution treats the path as
+    one argument and performs no command substitution.
+21. Audit hook: send unique secret strings in prompt, arguments, result, and
+    session fields. Confirm the JSONL file stores only bounded event/tool/time
+    metadata and none of the secret strings. Confirm local ignore and 14-day
+    retention behavior.
 
-## Phase 3 — Live hooks (the main event)
+Every hook script must exit zero. Malformed unknown payloads may allow; a parsed
+edit path that cannot be resolved inside a writable root must deny.
 
-> Re-verification note: a prior live run found the guards fail-open because the
-> GA CLI sends `toolArgs` as a JSON-encoded string (not an object); the guards
-> were fixed to decode it. This phase confirms the fix fires live. If a probe is
-> NOT blocked, capture the exact audit payload for that call — the shape may have
-> shifted again.
+## Phase 4: Live hook wiring after consent
 
-First ask the human whether hooks are enabled on this surface (VS Code agent
-hooks are preview and may be disabled by org policy; the CLI has them GA). If
-they cannot be enabled, mark the hook checks SKIPPED with the reason and continue.
+Run only if the lead consented and the surface permits hooks.
 
-> Safety by design: every probe below is harmless even if **no** hook fires.
-> Do not use real destructive commands to test the guard.
+22. Open a fresh session and confirm `hooks-status` reports enabled.
+23. Attempt a harmless edit to `.env`; expect a live deny. Edit `notes.md`;
+    expect success. Attempt an edit through a symlink/junction that resolves
+    outside declared writable roots; expect a deny.
+24. Confirm the audit line remains metadata-only. Do not attempt to recover or
+    report raw hook payloads from the audit log.
+25. Run `akmaestro update`, then confirm hook activation remains enabled. Run
+    `hooks-disable` and confirm live hooks can be revoked.
 
-9. **Restricted path — deny.** Try to create/edit `.env` in this scratch repo
-   (any content). **Expected:** the edit is blocked and the deny reason mentions
-   the restricted-path guard. (If no hook fires, a `.env` appears in a scratch
-   repo — harmless; record FAIL.)
-10. **Restricted path — allow.** Create `notes.md` with one line.
-   **Expected:** succeeds, no interference.
-11. **Dangerous command — deny, via a benign sentinel.** Append this line to
-    `.agentic/hooks/dangerous-commands.txt`:
-    ```
-    ^echo AKM_GUARD_TEST$
-    ```
-    Then run the shell command `echo AKM_GUARD_TEST`. **Expected:** blocked by
-    the dangerous-command guard. (If no hook fires it just echoes — harmless;
-    record FAIL.) Remove the sentinel line afterwards.
-12. **Workspace boundary — deny.** Try to create `../akm-boundary-probe/x.txt`
-    (a sibling of this repo). **Expected:** blocked — the path resolves outside
-    the repository and no modifiable sibling repository is declared. (If no hook
-    fires, a stray sibling folder appears — delete it and record FAIL.)
-13. **Workspace boundary — modifiable sibling allow.** Create a sibling repo
-    `../akm-lib-b/` (plain `mkdir`), append the line `../akm-lib-b` to
-    `.agentic/hooks/editable-paths.txt`, then try to create
-    `../akm-lib-b/mod.py`. **Expected:** allowed. Also try
-    `../akm-lib-b/.env` — **Expected:** denied (restricted globs apply inside
-    sibling repositories). Clean up `../akm-lib-b/` and the added line afterwards.
-14. **Lint hook silence.** After the `notes.md` edit, confirm nothing lint-ish
-    was injected (no lint command is configured for `.md`). **Expected:** no-op.
+Record the exact surface and any organization-policy restriction.
 
-## Phase 4 — Audit trail: capture the real payloads
+## Phase 5: Developer handoff and feature flow
 
-15. Check `.agentic/audit/` for a `<date>.jsonl` file. **Expected:** if hooks
-    are enabled, it exists and grew during Phase 3.
-16. From the `.jsonl` lines, extract and report the **real payload shape** —
-    this is the data we need to validate the guards' field guesses:
-    - the event names seen (`hook_event_name` / `hookEventName` values);
-    - the tool names Copilot uses for file edits and shell commands;
-    - whether arguments arrive as `toolArgs` or `tool_input`;
-    - the exact field name that carries the file path, and the one that
-      carries the shell command.
+26. From the committed setup in a fresh developer session, do not run
+    `/akmaestro-init`; run `/feature`.
+27. Confirm `/feature` validates shared finalization and probes local `uv`,
+    Graphifyy version/query, LSPs, and graph artifacts. Decline one remediation
+    and confirm feature mutation remains blocked; alter a recorded action and
+    confirm the controller rejects it; approve the exact action and rerun. If uv
+    itself is absent in a separate scratch environment, confirm `/feature`
+    offers the official platform installer and makes no workflow mutation.
+28. Start a small feature. Confirm shared state is under
+    `.agentic/features/<id>/`, local selection is
+    `.agentic/local/active-feature.json`, and no shared `index.json` exists.
+29. Walk Understand -> Frame -> Split. Confirm each approval gate is real and
+    artifacts are useful and persisted before transitions.
+30. Run one guided story. If possible, run another autonomous story and confirm
+    Prime -> Plan -> Implement -> Review -> Learn loops internally until a real
+    blocker. Guided implement-to-review must use fresh context.
+31. From a cold session, compare `/status` with `/feature` orientation. Both must
+    derive the same phase/story/next command; `/status` must mutate nothing.
 
-    Paste 2–3 representative raw lines into the results file, **redacting**
-    any file contents, prompts, or anything internal — keep only structure and
-    field names.
+## Phase 6: Multi-repository boundary
 
-## Phase 5 — /init end-to-end (interactive; the human answers)
+When modifiable and read-only siblings are declared:
 
-17. Run `/init` **as the team lead** and walk the flow with the human. Record:
-    - does it **chain** to `setup-instructions` → `setup-tooling` →
-      `setup-skills` → `setup-hooks` by itself, or must each be invoked by hand?
-    - does it write `.agentic/setup/initialization-state.json` and resume
-      correctly if you stop and run `/init` again in a **new** session?
-    - is state version 2, with a revision, no persisted `overall`/`currentStep`,
-      and controller-derived status?
-    - does tooling write `.agentic/setup/environment-requirements.json` with
-      required `uv`, Graphifyy, selected `lsp-*`, and graph entries?
-    - does `init status` report sensibly mid-flow?
-    - on completion: is `AGENTS.md` filled in with real repo facts, and is
-      `.github/AGENTIC.md` written?
-
-**Expected:** the flow drives itself, persists state, resumes, and completes
-with both files written. `.agentic/local/` remains ignored. Time-box it; a
-genuine setup blocker may be documented, but `/feature` will still require local
-readiness before mutation.
-
-## Phase 6 — /teach
-
-18. Say: *"remember that in this repo, test files always end in `_spec`"*.
-    **Expected:** the teach skill gates/refines it, proposes root `AGENTS.md`
-    (or a scoped instructions file), shows the exact text and placement, and
-    asks before writing. Record where it landed.
-
-## Phase 7 — Stage 2 mini-feature (optional, ~30+ min)
-
-19. In a fresh **developer** session, skip `/init` and run `/feature`. Record:
-    does it verify the shared initialization, probe local readiness, and offer
-    missing remediation actions for confirmation? Decline one once and confirm
-    feature mutation remains blocked; then approve/remediate and rerun.
-20. Start a tiny toy feature. Confirm state is created without a shared
-    `index.json`, the selection is in `.agentic/local/active-feature.json`, and
-    the derived handoff is `/feature-understand`.
-21. Walk Understand → Frame → Split with the human. At each gate, record whether
-    it offers to **continue in the same session while context is light** (it
-    should) and whether artifacts (`understanding.md`, `feature.md`, story
-    files) are written under `.agentic/features/<id>/`.
-22. Run one story in **guided** mode and, if a second story exists, one in
-    **autonomous** mode. Record: does autonomous run Prime→…→Learn in one
-    session without stopping? Does implement → review insist on a fresh session
-    in guided mode (it must — no same-session offer there)?
-23. From a cold session, ask `/feature` *"where are we?"*. **Expected:** correct
-    phase/story/next command derived from disk state. Interrupt once after an
-    artifact write and before transition; rerun and confirm the old state resumes
-    without corruption or duplicate advancement.
-
----
+32. Confirm only modifiable sibling paths are in
+    `.agentic/hooks/editable-paths.txt`.
+33. Confirm a feature story may read both siblings, may edit and run commands in
+    the modifiable sibling, and never edits the read-only sibling.
+34. Confirm all sibling graphs remain under the main repository's local cache.
 
 ## Report
 
-Write `copilot-test-results.md`:
+Use this table:
 
 | # | Check | Expected | Actual | Result |
-|---|-------|----------|--------|--------|
-| 0.1 | 18 skills installed | 18 | … | |
-| … | | | | |
+|---|---|---|---|---|
+| 1 | Installed skills | 19, including `akmaestro-init` | | |
 
-Then: the redacted audit payload samples (Phase 4), the `/doctor` report, and a
-short summary — what worked, what broke (verbatim errors), and anything
-surprising a teammate should know before rolling this out.
+Include the `/doctor` verdict, setup final inventory, hook surface/policy, and a
+short list of failures with exact non-sensitive errors. Do not include secrets
+or raw prompt/tool/session content.

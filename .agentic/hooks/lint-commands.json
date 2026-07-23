@@ -1,9 +1,9 @@
 {
-  "_comment": "Map a file extension (no dot) to a lint command for lint-on-edit. Use {file} as the path placeholder. Add real top-level keys like \"py\" to activate. Empty of active entries by default, so lint-on-edit is a no-op until configured. The _examples block is illustrative only and is NOT used (lint-on-edit looks up the extension as a top-level key).",
+  "_comment": "Map a file extension (no dot) to a structured lint command. command must be a bare executable name; args must be an array of strings containing at least one {file} placeholder. Commands run directly without a shell. Add real top-level keys like \"py\" to activate. The _examples block is illustrative only and is not used.",
   "_examples": {
-    "py": "ruff check {file}",
-    "ts": "npx eslint {file}",
-    "js": "npx eslint {file}",
-    "go": "gofmt -l {file}"
+    "py": { "command": "ruff", "args": ["check", "{file}"] },
+    "ts": { "command": "npx", "args": ["--no-install", "eslint", "{file}"] },
+    "js": { "command": "npx", "args": ["--no-install", "eslint", "{file}"] },
+    "go": { "command": "gofmt", "args": ["-l", "{file}"] }
   }
 }

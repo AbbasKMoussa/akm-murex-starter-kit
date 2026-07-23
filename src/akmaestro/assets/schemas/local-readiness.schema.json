@@ -14,7 +14,7 @@
   ],
   "properties": {
     "$schema": { "const": "../schemas/local-readiness.schema.json" },
-    "version": { "const": 2 },
+    "version": { "const": 3 },
     "requirementsHash": {
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
@@ -45,7 +45,12 @@
                 "minItems": 1,
                 "items": { "type": "string", "minLength": 1 }
               },
-              "cwd": { "type": "string", "minLength": 1 }
+              "cwd": { "type": "string", "minLength": 1 },
+              "timeoutSeconds": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3600
+              }
             }
           }
         }

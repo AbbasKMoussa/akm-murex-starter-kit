@@ -5,7 +5,32 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.13"
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          enable-cache: true
+          version: "0.11.29"
+      - run: uv sync --frozen
+      - run: uv run --frozen ruff check src tests
+      - run: uv run --frozen ruff format --check src tests
+
   test:
     strategy:
       fail-fast: false
@@ -13,34 +38,113 @@ jobs:
         os: [ubuntu-latest, windows-latest]
         python: ["3.9", "3.13"]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: ${{ matrix.python }}
-      - run: python -m pip install -e . pytest jsonschema
-      - run: pytest -q
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          enable-cache: true
+          version: "0.11.29"
+      - run: uv sync --frozen
+      - run: uv run --frozen pytest -q
 
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.13"
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "0.11.29"
       - run: uv build --wheel
-      - name: Verify the wheel bundles skills, hooks, and state runtime
+      - name: Verify wheel contents
+        shell: python
         run: |
-          python3 - <<'EOF'
-          import glob, sys, zipfile
+          import glob
+          import zipfile
+
           names = zipfile.ZipFile(glob.glob("dist/*.whl")[0]).namelist()
-          skills = {n.split("/assets/skills/")[1].split("/")[0]
-                    for n in names if "/assets/skills/" in n}
-          hooks = [n for n in names if "/assets/hooks/" in n]
-          assert len(skills) == 18, f"expected 18 skills in wheel, got {len(skills)}: {sorted(skills)}"
-          assert any(n.endswith("hooks.json") for n in hooks), "hooks.json missing from wheel"
-          assert any(n.endswith("akmaestro/state.py") for n in names), "state controller missing"
-          schemas = [n for n in names if "/assets/schemas/" in n and n.endswith(".json")]
-          assert len(schemas) == 6, f"expected 6 schemas, got {len(schemas)}"
-          assert any(n.endswith("/assets/runtime/STATE-PROTOCOL.md") for n in names), "state protocol missing"
-          assert not any(n.endswith(".pyc") for n in names), "stray .pyc in wheel"
-          print(f"wheel OK: {len(skills)} skills, {len(hooks)} hook files, {len(schemas)} schemas")
-          EOF
+          skills = {
+              name.split("/assets/skills/")[1].split("/")[0]
+              for name in names
+              if "/assets/skills/" in name
+          }
+          expected = {
+              "status", "akmaestro-init", "setup-instructions", "setup-tooling",
+              "setup-skills", "setup-hooks", "teach", "doctor", "feature",
+              "feature-understand", "feature-frame", "feature-split", "story-prime",
+              "story-plan", "story-implement", "story-review", "story-learn",
+              "feature-review", "feature-retro",
+          }
+          assert skills == expected, (
+              f"skill mismatch: missing={sorted(expected - skills)}, "
+              f"unexpected={sorted(skills - expected)}"
+          )
+          assert not any("/assets/skills/init/" in name for name in names)
+          for skill in expected:
+              assert any(name.endswith(f"/assets/skills/{skill}/SKILL.md") for name in names)
+          schemas = [
+              name for name in names
+              if "/assets/schemas/" in name and name.endswith(".json")
+          ]
+          assert len(schemas) == 7, f"expected 7 schemas, got {len(schemas)}"
+          required = (
+              "/assets/hooks/hooks.json",
+              "/assets/hooks-data/lint-commands.json",
+              "/assets/runtime/STATE-PROTOCOL.md",
+              "/assets/skills/setup-instructions/references/instructions-evidence.example.json",
+              "/akmaestro/state.py",
+          )
+          for suffix in required:
+              assert any(name.endswith(suffix) for name in names), f"missing {suffix}"
+          assert not any(name.endswith((".pyc", ".DS_Store")) for name in names)
+          print(f"wheel OK: {len(skills)} skills, {len(schemas)} schemas")
+
+  installed-wheel-smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.13"
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "0.11.29"
+      - run: uv build --wheel
+      - name: Install and run wheel
+        shell: python
+        run: |
+          import glob
+          import json
+          import pathlib
+          import subprocess
+          import sys
+          import tempfile
+
+          wheel = glob.glob("dist/*.whl")[0]
+          subprocess.run([sys.executable, "-m", "pip", "install", wheel], check=True)
+          with tempfile.TemporaryDirectory() as directory:
+              root = pathlib.Path(directory)
+              subprocess.run(["git", "init", "-q", str(root)], check=True)
+              subprocess.run([sys.executable, "-m", "akmaestro.cli", "init", "--path", str(root)], check=True)
+              assert (root / ".github/skills/akmaestro-init/SKILL.md").is_file()
+              assert (root / ".agentic/schemas/action-checks.schema.json").is_file()
+              hooks = json.loads((root / ".github/hooks/hooks.json").read_text(encoding="utf-8"))
+              assert hooks["disableAllHooks"] is True

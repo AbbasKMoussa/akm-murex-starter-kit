@@ -1,95 +1,150 @@
 ---
 name: setup-hooks
 description: >-
-  Install and verify the kit's optional Copilot hooks for this repo — guard
-  rails, auditing, and lint-on-edit, configured in .github/hooks/. Use for
-  "/setup-hooks", "set up hooks/guard rails", or the hooks step of /init. Hooks
-  are optional and install-by-default (opt-out).
-allowed-tools:
-  - shell
+  Review, configure, explicitly enable, and verify AKMaestro's optional Copilot
+  hooks. Use for "/setup-hooks", "set up hooks or guard rails", or the hooks
+  step of /akmaestro-init. Installed hooks remain disabled until the team lead
+  gives explicit consent.
 ---
 
-# setup-hooks — guard rails, audit, lint (optional)
+# setup-hooks - optional guard rails, audit, and lint
 
-Hooks are a portable standard in `.github/hooks/*.json` (Copilot CLI GA, VS Code
-preview, cloud agent). They are **optional**: install the recommended set by
-default, let the user decline per hook or entirely, and degrade gracefully where
-org policy disables them. Hooks never block overall setup completion.
+Hooks are optional and are never a prerequisite for AKMaestro. The installer
+places the recommended files in the repository with `disableAllHooks: true`.
+Do not enable them implicitly. Copilot CLI support is GA; VS Code support may be
+preview or disabled by organization policy, so report the verified surface and
+degrade cleanly.
 
 ## State protocol
 
-Read `.agentic/STATE-PROTOCOL.md`. Run `setup-init` and `setup-status` through
-the bundled controller. If the user declines hooks entirely, transition `hooks`
-directly to `skipped` and stop. Otherwise ensure the topic is `in_progress` with
-the revision just read. Never edit aggregate setup state directly.
+Read `.agentic/STATE-PROTOCOL.md`. Use the bundled controller for state, merge,
+and hook activation commands. If the topic is not `in_progress`, transition it
+using the revision from `setup-status`. Never edit controller-owned state by
+hand.
+
+Start with `hooks-status`. Explain the selected behavior before asking for one
+explicit choice: enable all selected hooks, customize the selection, or decline.
+
+- Decline: run `hooks-disable`, transition the optional topic to `skipped`, and
+  return to `/akmaestro-init`.
+- Organization policy prevents hooks: keep them disabled, write strict evidence
+  with the policy blocker, and transition to `blocked`.
+- Consent to enable: continue below. Consent to installation is not consent to
+  activation.
 
 ## Recommended set
 
 | Hook | Event | Behavior |
 | --- | --- | --- |
-| Restricted-path guard | `preToolUse` | deny edits to restricted paths |
-| Dangerous-command guard | `preToolUse` | deny destructive shell commands |
-| Audit log | `userPromptSubmitted`/`postToolUse`/`sessionEnd` | local JSONL trail |
-| Lint-on-edit | `postToolUse` | run configured linter on changed file |
+| Restricted-path guard | `preToolUse` | Denies edits outside declared writable roots and to restricted paths. |
+| Dangerous-command guard | `preToolUse` | Denies known destructive shell commands. |
+| Audit log | `userPromptSubmitted`, `postToolUse`, `sessionEnd` | Records metadata only in a local, retained JSONL log. |
+| Lint-on-edit | `postToolUse` | Runs a structured, shell-free linter command on the changed file. |
 
-## Install
+Hooks are defense in depth, not a general command sandbox. The workflow and
+controller enforce read-only sibling boundaries for their own actions; the
+dangerous-command denylist cannot prove an arbitrary shell command harmless.
 
-The installer drops `.github/hooks/hooks.json`, `.github/hooks/scripts/*`, and
-seed data in `.agentic/hooks/`. This step:
+## Configure without overwriting
 
-- confirms the files are present and the `.sh` scripts are executable;
-- **seeds repo-specific data**: add the restricted areas from `AGENTS.md` to
-  `.agentic/hooks/restricted-paths.txt`; add each **modifiable sibling
-  repository** from the Workspace & Dependencies section to the compatibility
-  file `.agentic/hooks/editable-paths.txt` (the boundary rule: edits outside the
-  repo are denied unless under a listed path; read-only sibling repositories are
-  never listed); add detected lint commands (per extension, `{file}` placeholder)
-  to `.agentic/hooks/lint-commands.json`;
-- never overwrites an existing hook config or a script the user customized —
-  merge handler arrays per event; show changes and confirm.
+Confirm these installed files exist:
 
-## Safety reminder
+- `.github/hooks/hooks.json` and every referenced script;
+- `.agentic/hooks/restricted-paths.txt`;
+- `.agentic/hooks/editable-paths.txt`;
+- `.agentic/hooks/dangerous-commands.txt`;
+- `.agentic/hooks/lint-commands.json`.
 
-`preToolUse` is fail-closed (a crashing guard denies the tool call). The shipped
-guards always exit 0 and default to **allow** on any uncertainty, denying only on
-a positive match. Do not "harden" them into failing closed on error.
+Add only confirmed modifiable sibling roots to `editable-paths.txt`; never add a
+read-only sibling. Keep generated graphs under the main repository's
+`.agentic/local/graphs/` tree. Configure lint commands as a bare executable plus
+an argument array containing `{file}`; shell executables and command strings are
+invalid.
 
-## Validate (allow AND deny)
+For any existing instruction or hook file, write the complete proposed content
+to a local temporary file, then use:
 
-- `jq . .github/hooks/hooks.json` parses; events/handlers are valid.
-- Scripts exist and `.sh` are executable; `jq` present (bash guards need it).
-- Dry-run the guards with the **real CLI payload shape** — `toolArgs` is a
-  JSON-encoded *string*, not a nested object (an object-form probe passes even
-  against dead guards). On Windows, pipe the same JSON to the `.ps1` via `pwsh`.
-  - `printf '%s' '{"toolName":"edit","toolArgs":"{\"path\":\".env\"}"}' | bash .github/hooks/scripts/restricted-path-guard.sh` → deny
-  - same with inner `"path":"README.md"` → allow
-  - same with inner `"path":"../not-a-declared-dep/x.txt"` → deny (workspace boundary)
-  - if a modifiable sibling repository is declared, inner path under it → allow
-  - `printf '%s' '{"toolName":"powershell","toolArgs":"{\"command\":\"rm -rf /\"}"}' | bash .github/hooks/scripts/dangerous-command-guard.sh` → deny
-  - same with inner `"command":"ls -la"` → allow
+```text
+uv run --no-project python .agentic/bin/akmaestro-state.py merge-plan --target <repo-relative-target> --input <proposed-file>
+```
 
-This validates script logic against the real payload shape. The definitive
-live-session confirmation still belongs in an actual Copilot session.
+Show the returned unified diff. Apply only after explicit confirmation:
 
-## New session
+```text
+uv run --no-project python .agentic/bin/akmaestro-state.py merge-apply --plan-id <id> --approved
+```
 
-After installing hooks, ask the user to open a new Copilot session and trigger a
-guard's deny path (e.g. attempt an edit to a restricted path) to confirm.
+If the target changes after review, the controller rejects the plan. Create a
+new plan; never force or silently reconstruct the merge.
 
-## State
+## Validate while disabled
 
-Create local JSON evidence containing installed/declined hooks, config paths,
-per-hook validation, verified surfaces, policy restrictions, and new-session
-result. Write it with `evidence-write hooks`; this produces committed
-`.agentic/setup/hooks-state.json` without a duplicate topic status.
+Run deterministic dry checks before activation. Use the real Copilot CLI payload
+shape, where `toolArgs` is a JSON-encoded string. Test the platform variant that
+will be used, and both Bash and PowerShell when available:
 
-## Completion
+1. Parse `hooks.json`; confirm `disableAllHooks` is still `true`, all referenced
+   scripts exist, and Bash scripts are executable.
+2. Restricted guard: `.env` -> deny, `README.md` -> allow, undeclared sibling ->
+   deny, declared modifiable sibling -> allow, and a symlink/junction escape ->
+   deny.
+3. Dangerous-command guard: a known destructive command -> deny and a harmless
+   command -> allow.
+4. Lint hook: use a filename containing spaces and shell metacharacters; confirm
+   the configured executable is invoked directly with the filename as one
+   argument and no command substitution occurs.
+5. Audit hook: confirm it stores event/tool/file/status metadata only, never raw
+   prompt text, tool arguments/results, credentials, or session identifiers;
+   confirm local ignore, restrictive permissions where supported, and retention.
 
-Hooks are optional, so they never block setup. The topic is "done" when the
-chosen hooks are installed, valid, and their guards fired both allow and deny on
-at least the GA CLI; or recorded as `blocked` if policy disables them.
+The scripts must always exit zero because a crashing `preToolUse` hook denies the
+tool call. Unknown payloads may allow, but a parsed edit path that cannot be
+canonically resolved must be denied.
 
-Write evidence first. Then transition `hooks` from `in_progress` to `complete`,
-or to `blocked --reason <reason>` when policy prevents validation, passing the
-latest aggregate `--expected-revision`. Rerun `setup-status` and report its
-derived next command.
+## Enable after consent
+
+When all selected dry checks pass and consent is explicit, run:
+
+```text
+uv run --no-project python .agentic/bin/akmaestro-state.py hooks-enable
+```
+
+Run `hooks-status` and require `enabled: true`. To revoke consent or recover from
+a hook problem, run `hooks-disable`; this state is preserved by `akmaestro
+update`.
+
+Ask for one fresh Copilot session only when needed to load the activation. A
+live allow/deny probe is recommended but may be recorded as `not tested` in the
+report; do not invent a verified surface.
+
+## Strict evidence
+
+Write `evidence-write hooks` with exactly this shape, replacing every value with
+actual results:
+
+```json
+{
+  "enabled": true,
+  "selectedHooks": ["restricted-path", "dangerous-command", "audit-log", "lint-on-edit"],
+  "configPath": ".github/hooks/hooks.json",
+  "checks": [
+    {"id": "config", "status": "passed", "detail": "Parsed; enabled only after consent"},
+    {"id": "restricted-path", "status": "passed", "detail": "Allow, deny, boundary, and canonical-path probes passed"},
+    {"id": "dangerous-command", "status": "passed", "detail": "Allow and deny probes passed"},
+    {"id": "audit-privacy", "status": "passed", "detail": "Metadata-only output and retention verified"},
+    {"id": "lint-direct-exec", "status": "passed", "detail": "Structured direct execution probe passed"}
+  ],
+  "verifiedSurfaces": ["copilot-cli-windows"],
+  "blockers": []
+}
+```
+
+Use `failed` for retryable failures and leave the topic `in_progress`. Use
+`blocked` plus a concise string in `blockers` only for a real environment or
+policy restriction. `verifiedSurfaces` contains only live sessions actually
+tested; dry-run platforms belong in check details.
+
+Write evidence before the terminal transition. Enabled hooks may complete only
+when every selected check passed and `hooks-status` agrees. Transition to
+`blocked --reason <reason>` for policy blocks. Rerun `setup-status` and return to
+the orchestrator. The only cross-session resume command is `/akmaestro-init`.

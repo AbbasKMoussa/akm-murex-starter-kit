@@ -7,7 +7,7 @@
   "required": ["$schema", "version", "featureId", "selectedAt"],
   "properties": {
     "$schema": { "const": "../schemas/active-feature.schema.json" },
-    "version": { "const": 2 },
+    "version": { "const": 3 },
     "featureId": {
       "type": "string",
       "pattern": "^[a-z0-9][a-z0-9-]{0,99}$"

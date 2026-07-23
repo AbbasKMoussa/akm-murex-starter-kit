@@ -3,8 +3,9 @@ name: feature
 description: >-
   Orchestrate the feature flow, verify developer readiness, and report where
   work stands. Use to start, select, resume, or inspect a feature: "start a
-  feature", "where are we?", "what's next?", "resume the feature", "/feature",
-  "feature status", or "feature help". Reads deterministic on-disk state.
+  feature", "where are we on this feature?", "resume the feature", "/feature",
+  "feature status", or "feature help". Reads deterministic on-disk state. Use
+  the status skill for an unqualified "where are we?" across all workflows.
 allowed-tools:
   - shell
 ---
@@ -23,16 +24,29 @@ Read `.agentic/STATE-PROTOCOL.md`. Use:
 uv run --no-project python .agentic/bin/akmaestro-state.py <command>
 ```
 
+Before the first controller call, verify `uv` is on PATH. If it is missing,
+explain that uv is the controller bootstrap and show the platform's official
+installer (`powershell -ExecutionPolicy ByPass -c "irm
+https://astral.sh/uv/install.ps1 | iex"` on Windows, or `curl -LsSf
+https://astral.sh/uv/install.sh | sh` on macOS/Linux). Explain that it downloads
+and executes the uv installer and may update PATH; run it only after explicit
+confirmation. Then stop and ask for a new terminal/Copilot session before
+rerunning `/feature`. This is the only pre-controller bootstrap exception; do
+not mutate workflow state or install any other prerequisite this way.
+
 Run `setup-status`. If repository initialization is not complete, stop: the team
-lead must finish and commit `/init`. A developer must never rerun `/init` merely
+lead must finish and commit `/akmaestro-init`. A developer must never rerun
+`/akmaestro-init` merely
 because their workstation is missing a tool.
 
 Run `readiness-check`. When it exits `3`:
 
 1. Show every missing required tool/artifact and its controller-reported action.
 2. Explain what each command changes and ask for confirmation before running it.
-3. Run the exact confirmed argument array in its recorded relative working
-   directory; never interpolate it into another command or add untrusted text.
+3. Write the exact recorded action object to a local input file and run it
+   without a shell through `remediation-run --input <file> --approved`. Never
+   reconstruct, interpolate, or add untrusted text. Pass `--approved` only after
+   the confirmation in step 2.
 4. Rerun `readiness-check`.
 5. If requirements remain missing or the user declines, stop feature mutation
    with the exact remediation. Do not bypass the mandatory gate.

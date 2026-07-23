@@ -20,7 +20,7 @@
   ],
   "properties": {
     "$schema": { "const": "../../schemas/feature-state.schema.json" },
-    "version": { "const": 2 },
+    "version": { "const": 3 },
     "revision": { "type": "integer", "minimum": 0 },
     "featureId": { "$ref": "#/$defs/featureId" },
     "title": { "type": "string", "minLength": 1 },

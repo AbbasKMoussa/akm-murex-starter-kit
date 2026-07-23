@@ -1,7 +1,7 @@
 # Setup Flow Decisions
 
 Date: 2026-06-19
-Last updated: 2026-07-14
+Last updated: 2026-07-18
 
 ## Context
 
@@ -39,7 +39,7 @@ The flow may span multiple sessions, so setup state must be persisted on disk.
      prerequisite on every developer machine.
    - Source of truth: an internal git repo, intended for publication to the
      internal Python registry (PyPI / Artifactory).
-   - `akmaestro init` is a non-destructive asset installer: it installs all 18
+   - `akmaestro init` is a non-destructive asset installer: it installs all 19
      skills, optional hooks, schemas, the state protocol/controller, and
      bootstrap pointers. Detection and interview logic runs later in the skills.
    - `akmaestro update` upgrades kit-owned files using the SHA-256 manifest while
@@ -60,11 +60,11 @@ The flow may span multiple sessions, so setup state must be persisted on disk.
    .agentic/
      setup/
        initialization-state.json
-       answers.json
        detected-repo.json
+       action-checks.json
        environment-requirements.json
-       install-log.md
-     local/                    # gitignored active feature, readiness, locks
+       *-state.json
+     local/                    # gitignored active feature, readiness, graphs, locks
    ```
 
 5. Generated files should be repo-specific.
@@ -79,9 +79,17 @@ The flow may span multiple sessions, so setup state must be persisted on disk.
    confirmation. New files can be created freely; existing customization is
    protected.
 
-7. Hooks are optional but installed by default (opt-out).
+7. Hook assets are optional, installed disabled, and activated only by explicit
+   consent (revised decision).
 
-   Hooks are a portable standard configured in `.github/hooks/*.json` (same format across Copilot CLI, the cloud agent, and VS Code, and Claude-compatible). They are GA on Copilot CLI (Feb 2026) and preview on VS Code, so the kit must never depend on them and must degrade gracefully where org policy disables them. The kit installs a recommended set — restricted-path guard, dangerous-command guard, audit log, lint-on-edit — which the user can decline per hook or entirely. `preToolUse` is fail-closed, so guard scripts must default to `allow` on any uncertainty and only deny on a positive match. The fourth initialization topic; see `docs/init-topics/hooks.md`.
+   Hooks are configured in `.github/hooks/*.json`. They are GA on Copilot CLI
+   and may be preview or policy-disabled in VS Code, so the kit never depends on
+   them. The installer may place the recommended restricted-path,
+   dangerous-command, metadata audit, and lint-on-edit assets, but
+   `disableAllHooks` remains true until `/setup-hooks` explains the behavior,
+   tests it, and receives explicit lead consent. Guard scripts always exit zero;
+   unknown payloads allow, while a parsed edit path outside canonical writable
+   roots is denied. See `docs/init-topics/hooks.md`.
 
 8. The first agreed initialization topic is instruction files.
 
@@ -112,20 +120,24 @@ The flow may span multiple sessions, so setup state must be persisted on disk.
 
     - Frontmatter: `name` (required, lowercase + hyphens), `description` (required — what it does and when to use it), optional `license`, optional `allowed-tools` (e.g. `shell`).
     - Invocation: auto-discovered from the description, or `/<name>` in the slash menu — in both surfaces.
-    - The kit's own flows ship as skills (e.g. `init`), so `/init` and natural language both work everywhere. This replaces the previously proposed `.github/prompts/init.prompt.md` + `.github/agents/init.agent.md` pair.
+    - The kit's own flows ship as skills. Repository setup uses the distinct
+      `akmaestro-init` name, so `/akmaestro-init` and natural language work
+      without colliding with VS Code's built-in `/init`. This replaces the
+      previously proposed prompt/agent pair.
 
     Skill format and locations are verified in "GitHub Copilot Agent Skills" below.
 
 12. Skills are the third initialization topic (decided).
 
-    The CLI bootstrap installs the complete 18-skill set up front: seven Stage 1
-    skills/helpers and eleven Stage 2 skills. `/setup-skills` validates that fixed
-    bundled set and preserves any additional team-owned skills; it does not defer
-    Stage 2 installation or ask the user to choose a subset.
+    The CLI bootstrap installs the complete 19-skill set up front: one shared
+    `status` helper, seven Stage 1 skills/helpers, and eleven Stage 2 skills.
+    `/setup-skills` validates that fixed bundled set and preserves any additional
+    team-owned skills; it does not defer Stage 2 installation or ask the user to
+    choose a subset.
 
 13. The setup flow is hybrid: guided + à la carte (decided).
 
-    `/init` drives the topics in mandatory order and is resumable; each topic also
+    `/akmaestro-init` drives the topics in mandatory order and is resumable; each topic also
     runs standalone (`/setup-instructions`, `/setup-tooling`, `/setup-skills`,
     `/setup-hooks`). Both share the same per-topic logic and state. See
     `docs/setup-flow.md`.
@@ -146,13 +158,13 @@ The flow may span multiple sessions, so setup state must be persisted on disk.
 16. Completion gate: per-topic criteria must pass (decided).
 
     Each mandatory topic must meet its documented completion criteria — required
-    files exist AND tools/guards are verified — before `init` reports complete.
+    files exist and tools/guards are verified before `/akmaestro-init` finalizes.
 
-17. Stage 1 = per-topic skills + an `init` orchestrator; verb is `setup-<topic>`
-    (decided).
+17. Stage 1 = per-topic skills + an `akmaestro-init` orchestrator; topic names
+    use `setup-<topic>` (revised decision).
 
-    Stage 1 ships as five flow-skills — `init` (guided orchestrator, also handles
-    `init status`/`init help`) plus `setup-instructions`, `setup-tooling`,
+    Stage 1 ships as five flow skills: `akmaestro-init` (guided orchestrator,
+    status, and help) plus `setup-instructions`, `setup-tooling`,
     `setup-skills`, `setup-hooks` — alongside `teach` and `doctor`. Mirrors how
     `teach`/`doctor` are built as standalone auto-discoverable skills. This
     replaces the earlier mixed `init X` / `setup X` phrasing in the topic docs.
@@ -168,8 +180,10 @@ The flow may span multiple sessions, so setup state must be persisted on disk.
 19. The instructions gate is satisfied by root files only (decided).
 
     Root `AGENTS.md` + `copilot-instructions.md` + `tests.instructions.md` satisfy
-    the mandatory gate. Complex-module `AGENTS.md` files are tracked and
-    recommended but pending modules are warnings, not blockers.
+    the mandatory gate. Pending modules are warnings, not blockers. The default
+    module artifact is a path-scoped
+    `.github/instructions/<module-id>.instructions.md`; nested `AGENTS.md` is
+    generated only when explicitly requested for cross-agent use.
 
 20. Detection/interview/generation live in skills; state logic is deterministic
     code (revised decision).
@@ -182,44 +196,87 @@ The flow may span multiple sessions, so setup state must be persisted on disk.
 
 21. Execution readiness is part of "ready for agentic coding" (decided).
 
-    Instructions capture not just build/test but also how to **run/serve** the app
-    and how to **verify a change**. Setup runs a **smoke-verify** (build + test
-    once) so the agent operates on commands proven to work; smoke-verify is
-    blocked-not-failed. This serves both Stage 2 and ad-hoc dev+agent use.
+    Instructions capture product purpose/consumers/workflows; bootstrap, build,
+    test, lint, typecheck, run, and verify actions; manual verification; and
+    explicit Git policies. Detection retains provenance and the lead confirms
+    one summary. Structured actions run without a shell and with timeouts.
+    Configured finite checks must pass or have a genuine environmental blocker;
+    every repo needs an automated or manual verification path. The controller
+    enforces this topic-specific evidence and placeholder-free root artifacts.
 
-22. Setup generates a committed team-discoverability guide (decided).
+22. Setup generates a committed team-discoverability guide through deterministic
+    finalization (revised decision).
 
-    On completion, `init` writes `.github/AGENTIC.md` listing installed skills
+    On completion, `setup-finalize` writes `.github/AGENTIC.md` from validated
+    evidence, listing installed skills
     (and how to invoke them), active hooks, instruction-file locations, and
     run/verify commands — so every teammate who clones the repo understands the
-    initialized workflow. Regenerated on re-run; linked from `AGENTS.md`.
+    initialized workflow. Its hash is recorded in setup state. Finalization is
+    idempotent, and an existing unowned guide requires explicit replacement
+    confirmation.
 
-23. `/init` is team-lead-owned repository initialization (decided).
+23. `/akmaestro-init` is team-lead-owned repository initialization (revised
+    decision).
 
-    The lead runs the installer and `/init`, then commits the shared output.
-    Other developers never rerun `/init` for workstation setup; they begin with
+    The lead runs the installer and `/akmaestro-init`, then commits the shared output.
+    Other developers never rerun `/akmaestro-init` for workstation setup; they begin with
     `/feature` after pulling the initialization commit.
 
-24. State uses a hybrid v2 model with a bundled controller (decided).
+24. State uses a clean v3 contract with a bundled controller (revised decision).
 
     Committed state contains setup decisions/evidence, environment requirements,
     and feature/story progress. `.agentic/local/` contains readiness, active
     feature selection, locks, and temporary files and is always gitignored.
     Draft 2020-12 JSON Schemas document the contracts. Controller-owned JSON is
     updated atomically, guarded by revisions and cross-platform directory locks.
-    Derived navigation and completion fields are not persisted.
+    Derived navigation and completion fields are not persisted. There is no
+    migration because no earlier state contract shipped to users.
 
 25. `/feature` owns per-developer readiness (decided).
 
-    Every feature entry verifies the committed `/init` result and probes local
+    Every feature entry verifies the committed `/akmaestro-init` result and probes local
     `uv`, Graphifyy version/query probes, selected LSPs, and graph artifacts. Missing requirements
     block feature mutations. `/feature` shows structured argument-array
-    remediation actions and executes only after user confirmation. The readiness
-    result and active feature selection stay local. There is no v1 migration
-    because the state model was not shipped before v2.
+    remediation actions and, after user confirmation, passes the exact action to
+    controller-owned `remediation-run --approved`. The controller never invokes a
+    shell and confines the working directory to declared writable repositories.
+    The readiness result and active feature selection stay local. Because `uv`
+    bootstraps the controller itself, missing uv is the sole exception: `/feature`
+    may offer the official platform installer after explicit consent, then stops
+    for a PATH/session refresh before any workflow mutation.
+
+26. `/status` is the universal read-only orientation command (decided).
+
+    Unqualified "where are we?" and "what should I do next?" requests route to
+    `/status`. It reports setup first until initialization is complete, then
+    read-only local readiness and feature progress, ending with one exact next
+    action. It never mutates state, installs tools, or delegates to the next
+    step. Guidance remains flow-specific under `/akmaestro-init help` and `/feature help`;
+    `/doctor` remains the deeper health diagnostic.
+
+27. Graphifyy output is always developer-local (decided).
+
+    Main and sibling repository sources are indexed into
+    `.agentic/local/graphs/<repository-id>/graph.json` under the main
+    repository. Generated graphs are gitignored and are never written into a
+    read-only sibling repository.
+
+28. Existing-file review is controller-enforced (revised decision).
+
+    `merge-plan` stores an exact preimage hash and unified diff in local state.
+    `merge-apply --approved` applies atomically only when the target still has
+    the reviewed preimage. This removes ambiguity and rejects changes made
+    between review and application.
+
+29. Installer scope is an exact existing Git root (decided).
+
+    The CLI fails before writing for nested targets, reserved entry-point
+    collisions, and symlinked destination parents. `--dry-run` previews init and
+    update. Files and the manifest are written atomically; updates remove only
+    untouched retired kit assets and preserve explicit hook activation.
 
 The integrated Stage 1 spec (orchestrator, bootstrap, detection, state schema,
-merge policy, unified status/help) lives in `docs/setup-flow.md`. The four topic
+merge policy, universal status, and flow help) lives in `docs/setup-flow.md`. The four topic
 docs hold the per-topic depth.
 
 ## GitHub Copilot CLI Constraints
@@ -228,7 +285,10 @@ Verified from GitHub docs (2026-06):
 
 - Copilot CLI reads `AGENTS.md` and `.github/copilot-instructions.md` (both used if present); also `CLAUDE.md` / `GEMINI.md` at repo root, and a user-level `~/.copilot/copilot-instructions.md`.
 - Custom agents are `*.agent.md` Markdown files in `.github/agents/` (repo) or `~/.copilot/agents/` (user); invoked via the `/agent` slash command, the `--agent <name>` CLI flag, or natural-language inference from the agent description.
-- **Copilot CLI has no support for user-defined slash commands or reusable prompt files** (e.g. `.github/prompts/*.prompt.md`). This is an open feature request. Therefore the CLI trigger must be a custom agent or plain natural language, not a prompt file.
+- **Copilot CLI has no support for user-defined slash commands backed by reusable
+  prompt files** (for example `.github/prompts/*.prompt.md`). A prompt file is
+  therefore not the delivery mechanism; AKMaestro uses agent skills, which have
+  their own discovery/invocation behavior.
 
 Sources:
 
@@ -242,7 +302,8 @@ Verified from GitHub and VS Code docs (2026-06):
 
 - A skill is a folder containing a `SKILL.md` file (YAML frontmatter + Markdown instructions) plus any bundled scripts/templates/resources, referenced by relative path.
 - Required frontmatter: `name` (unique, lowercase letters/numbers/hyphens only) and `description` (what the skill does and when to use it). Optional: `license`, `allowed-tools` (e.g. `shell` to pre-approve tool use).
-- Repo-level locations: `.github/skills/`, `.claude/skills/`, `.agents/skills/`. User-level: `~/.copilot/skills/`, `~/.claude/skills/`, `~/.agents/skills/`. The kit uses `.github/skills/` (repo) and may use `~/.copilot/skills/` (user-level bootstrap).
+- Repo-level locations: `.github/skills/`, `.claude/skills/`, `.agents/skills/`.
+  The kit uses `.github/skills/` only.
 - Discovery/invocation: auto-discovered from the description when relevant, or invoked explicitly as `/<name>`. This works in VS Code Copilot, Copilot CLI, and the cloud agent — it is an open, portable standard.
 
 Sources:
@@ -259,12 +320,12 @@ The initialized target repository may contain:
   copilot-instructions.md   # short pointer to AGENTS.md
   AGENTIC.md                # committed team-discoverability guide (decision 22)
   instructions/             # path-scoped *.instructions.md
-  skills/                   # all 18 Stage 1 + Stage 2 skills
+  skills/                   # all 19 shared-helper, Stage 1, and Stage 2 skills
   hooks/                    # hooks.json + scripts (optional topic)
 
 AGENTS.md                   # main source of truth
 
-<complex-module>/AGENTS.md  # nested, for complex modules
+<complex-module>/AGENTS.md  # optional only when explicitly requested
 
 .agentic/
   bin/                      # bundled deterministic state controller
@@ -274,8 +335,6 @@ AGENTS.md                   # main source of truth
   local/                    # developer/worktree state, gitignored
   audit/                    # local, gitignored audit trail
   features/                 # Stage 2
-  stories/                  # Stage 2
-  decisions/                # general / Stage 2
 ```
 
 The exact set depends on repository needs, team preference, and tool support;

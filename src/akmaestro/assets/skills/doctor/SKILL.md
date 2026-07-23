@@ -7,14 +7,13 @@ description: >-
   troubleshoot the agentic setup: "is setup healthy?", "run doctor", "diagnose",
   "why isn't X working", or right after install. Read-only by default; applies
   safe fixes only when the user explicitly asks (e.g. "doctor fix" / "--fix").
-allowed-tools:
-  - shell
 ---
 
 # doctor — diagnose the agentic setup
 
 Run a health check across the whole agentic setup and produce an actionable
-report. This is distinct from `init status` (which reports setup *progress*):
+report. This is distinct from `/akmaestro-init status` (which reports setup
+*progress*):
 doctor actively *probes* the environment and files for problems.
 
 ## Modes
@@ -47,13 +46,24 @@ fix when not `ok`.
 
 ### 2. Instruction files
 
-- `AGENTS.md` exists and contains the core sections (Product, Build, Tests, Run,
-  Verify a Change, CI, Git Workflow, Agent Rules). Missing file → **fail**;
-  missing sections → **warn**.
-- Smoke-verify result is recorded in `instructions-state.json` as passed or
-  `blocked` (not skipped). Missing/skipped → **warn**.
+- `AGENTS.md` exists and contains the controller-required sections (Product,
+  Repository Context, Workspace & Dependencies, Stack, Setup, Build, Tests,
+  Run, Verify a Change, CI, Complex Modules, Git Workflow, Agent Rules).
+  Missing file → **fail**; missing sections → **warn**.
+- No known AKMaestro bootstrap placeholder remains in `AGENTS.md` or test
+  instructions. A remaining placeholder → **fail**.
+- `instructions-state.json` passes the controller's topic-specific contract:
+  product summary/consumers/workflows, all seven command definitions and
+  results, at least one verification path, all six Git policies, repository
+  context, and generated-file claims. Invalid or legacy loose evidence →
+  **fail** (`/setup-instructions` rewrites it after confirmation).
+- Configured build/test/lint/typecheck/verify actions are `passed` or genuinely
+  `blocked`; passing results contain one matching hashed check per action;
+  bootstrap/run may be `documented`. A blocked result paired with a complete
+  instructions topic, an omitted/substituted action check, or an ordinary
+  failed/skipped result → **fail**.
 - `.github/AGENTIC.md` (team-discoverability guide) exists. Missing → **warn**
-  (regenerate via `/init`).
+  (regenerate via `/akmaestro-init`).
 - `.github/copilot-instructions.md` exists and is short/pointer-only. If it is
   large or duplicates `AGENTS.md` content → **warn** (it should only point to the
   canonical sources).
@@ -70,21 +80,23 @@ fix when not `ok`.
 - Run controller `readiness-check --no-write` in diagnose mode. Report each
   required local tool/artifact. A missing local requirement is **fail** with its
   recorded structured install/remediation action; do not send the developer through
-  `/init`.
-- `graphify --version` works; `graphify-out/graph.json` exists. Missing →
+  `/akmaestro-init`.
+- `graphify --version` works; the configured local graph exists under
+  `.agentic/local/graphs/<repository-id>/graph.json`. Missing →
   **fail**/**warn** with the install/extract commands from the tooling topic.
 - Each sibling repository declared in `AGENTS.md` (Workspace & Dependencies) has
-  its own `graphify-out/graph.json` and exists on disk. Missing → **warn** with
-  the `cd <dep> && graphify extract .` command.
+  its own graph under the main repository's `.agentic/local/graphs/` tree and
+  exists on disk. Missing → **warn** with the exact configured extraction
+  command. Never write generated graphs into a read-only sibling.
 - Each LSP listed in `.agentic/setup/tooling-state.json` responds to its version
   command.
 
 ### 4. Skills
 
 - `.github/skills/` exists.
-- All 18 bundled skills are present: Stage 1/helpers (`init`,
-  `setup-instructions`, `setup-tooling`, `setup-skills`, `setup-hooks`, `teach`,
-  `doctor`) and Stage 2 (`feature`, `feature-understand`, `feature-frame`,
+- All 19 bundled skills are present: shared helper (`status`), Stage 1/helpers
+  (`akmaestro-init`, `setup-instructions`, `setup-tooling`, `setup-skills`, `setup-hooks`,
+  `teach`, `doctor`) and Stage 2 (`feature`, `feature-understand`, `feature-frame`,
   `feature-split`, `story-prime`, `story-plan`, `story-implement`,
   `story-review`, `story-learn`, `feature-review`, `feature-retro`). Missing
   bundled skill → **fail**.
@@ -96,6 +108,9 @@ fix when not `ok`.
 
 - `.github/hooks/hooks.json` parses (`jq . hooks.json`) and has `version` and a
   `hooks` object with known event names. Parse error → **fail**.
+- Report `disableAllHooks` and compare it with hooks evidence. Disabled before
+  consent or after a skipped topic is healthy; an enabled/evidence mismatch is
+  **fail**.
 - Every script referenced by the config exists; `.sh` files are executable.
   Non-executable → **warn** (fixable).
 - `.agentic/hooks/restricted-paths.txt`, `dangerous-commands.txt`,
@@ -120,18 +135,24 @@ fix when not `ok`.
   - dangerous-command deny: `printf '%s' '{"toolName":"powershell","toolArgs":"{\"command\":\"rm -rf /\"}"}' | bash .github/hooks/scripts/dangerous-command-guard.sh` → expect `deny`.
   - dangerous-command allow: same with inner `"command":"ls -la"` → expect `allow`.
 
+  Also test a symlink/junction escape for the restricted guard, a filename with
+  spaces and shell metacharacters for structured lint execution, and a unique
+  secret in prompt/argument/result/session fields for the audit hook. An escape
+  that allows, command substitution that runs, or audit content that retains the
+  secret is **fail**.
+
   Wrong result → **fail**. This validates script *logic* against the real
   payload shape; the definitive live-session wiring is still best confirmed in an
   actual Copilot session (see `copilot-manual-test/`).
 
 ### 6. Setup state drift
 
-- `.agentic/bin/akmaestro-state.py`, `.agentic/STATE-PROTOCOL.md`, and all six
+- `.agentic/bin/akmaestro-state.py`, `.agentic/STATE-PROTOCOL.md`, and all seven
   schemas exist. Missing controller/schema -> **fail** (`akmaestro update`).
 - Run `uv run --no-project python .agentic/bin/akmaestro-state.py validate`.
   Every controller error is **fail**; warnings remain **warn**.
 - `setup-status` is derived and agrees with the topic evidence on disk. Never
-  repair `overall`, `currentStep`, `nextCommand`, or story status fields; v2 does
+  repair `overall`, `currentStep`, `nextCommand`, or story status fields; v3 does
   not store those duplicates.
 - Cross-check files claimed by setup evidence. Mismatch -> **warn**.
 - `.agentic/local/` is gitignored. Tracked readiness, active-feature, lock, or
@@ -163,9 +184,9 @@ doctor — agentic setup health
 Environment   ok    bash, jq, git, uv present; graphify 1.x
 Instructions  warn  backend/auth module still pending (/setup-instructions module backend/auth)
 Tooling       ok    graphify graph present; pyright 1.x
-Skills        ok    all 18 bundled skills valid
+Skills        ok    all 19 bundled skills valid
 Hooks         fail  restricted-path-guard allow-path returned deny (logic bug)
-State         ok    v2 schemas and transitions valid; local state ignored
+State         ok    v3 schemas and transitions valid; local state ignored
 
 Verdict: 1 failure, 1 warning.
 Most important next step: fix restricted-path-guard.sh allow path.

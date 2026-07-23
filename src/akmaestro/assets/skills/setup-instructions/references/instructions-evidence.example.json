@@ -1,0 +1,258 @@
+{
+  "product": {
+    "summary": "An example internal service that processes pricing requests for checkout.",
+    "consumers": [
+      "Checkout service",
+      "Pricing operations"
+    ],
+    "primaryWorkflows": [
+      "Calculate a price quote",
+      "Publish pricing rules"
+    ],
+    "sources": [
+      "README.md",
+      "team-lead confirmation"
+    ]
+  },
+  "commands": {
+    "bootstrap": {
+      "status": "configured",
+      "actions": [
+        {
+          "label": "Install dependencies",
+          "command": [
+            "uv",
+            "sync"
+          ],
+          "cwd": ".",
+          "timeoutSeconds": 600
+        }
+      ],
+      "sources": [
+        "uv.lock",
+        "README.md"
+      ]
+    },
+    "build": {
+      "status": "configured",
+      "actions": [
+        {
+          "label": "Build",
+          "command": [
+            "uv",
+            "build"
+          ],
+          "cwd": ".",
+          "timeoutSeconds": 600
+        }
+      ],
+      "sources": [
+        "pyproject.toml",
+        ".github/workflows/ci.yml"
+      ]
+    },
+    "test": {
+      "status": "configured",
+      "actions": [
+        {
+          "label": "Test",
+          "command": [
+            "uv",
+            "run",
+            "pytest"
+          ],
+          "cwd": ".",
+          "timeoutSeconds": 900
+        }
+      ],
+      "sources": [
+        "pyproject.toml",
+        ".github/workflows/ci.yml"
+      ]
+    },
+    "lint": {
+      "status": "not_applicable",
+      "reason": "No repository linter is configured.",
+      "sources": [
+        "team-lead confirmation"
+      ]
+    },
+    "typecheck": {
+      "status": "not_applicable",
+      "reason": "No separate typecheck is configured.",
+      "sources": [
+        "team-lead confirmation"
+      ]
+    },
+    "run": {
+      "status": "not_applicable",
+      "reason": "This example package has no long-running local service.",
+      "sources": [
+        "README.md",
+        "team-lead confirmation"
+      ]
+    },
+    "verify": {
+      "status": "configured",
+      "actions": [
+        {
+          "label": "Verify",
+          "command": [
+            "uv",
+            "run",
+            "pytest"
+          ],
+          "cwd": ".",
+          "timeoutSeconds": 900
+        }
+      ],
+      "sources": [
+        ".github/workflows/ci.yml",
+        "team-lead confirmation"
+      ]
+    }
+  },
+  "commandResults": {
+    "bootstrap": {
+      "status": "documented",
+      "detail": "The lead confirmed the action; dependencies were already satisfied.",
+      "checks": []
+    },
+    "build": {
+      "status": "passed",
+      "detail": "The build action exited successfully.",
+      "checks": [
+        {
+          "checkId": "11111111111111111111111111111111",
+          "actionHash": "0226244ded6a5e6db945e6eff94440785809912ac52533e272c7a5666e0c8249",
+          "status": "passed",
+          "exitCode": 0,
+          "detail": "Build completed.",
+          "checkedAt": "2026-07-17T00:00:00Z"
+        }
+      ]
+    },
+    "test": {
+      "status": "passed",
+      "detail": "The test action exited successfully.",
+      "checks": [
+        {
+          "checkId": "22222222222222222222222222222222",
+          "actionHash": "2791e678488f6830e6cad6448fa2dde72481fb1cc0fbe58c42c0d67cd80222ea",
+          "status": "passed",
+          "exitCode": 0,
+          "detail": "Tests passed.",
+          "checkedAt": "2026-07-17T00:00:00Z"
+        }
+      ]
+    },
+    "lint": {
+      "status": "not_applicable",
+      "detail": "No repository linter is configured.",
+      "checks": []
+    },
+    "typecheck": {
+      "status": "not_applicable",
+      "detail": "No separate typecheck is configured.",
+      "checks": []
+    },
+    "run": {
+      "status": "not_applicable",
+      "detail": "This example package has no long-running local service.",
+      "checks": []
+    },
+    "verify": {
+      "status": "passed",
+      "detail": "The full verification action exited successfully.",
+      "checks": [
+        {
+          "checkId": "33333333333333333333333333333333",
+          "actionHash": "fc2cc2eef798bb508b47115707eaffd6468a7a25bccd7fbf6bc1ce2703093828",
+          "status": "passed",
+          "exitCode": 0,
+          "detail": "Verification passed.",
+          "checkedAt": "2026-07-17T00:00:00Z"
+        }
+      ]
+    }
+  },
+  "manualVerification": {
+    "status": "configured",
+    "steps": [
+      "Inspect the generated package metadata and confirm the expected version."
+    ],
+    "sources": [
+      "team-lead confirmation"
+    ]
+  },
+  "gitWorkflow": {
+    "baseBranch": "main",
+    "policies": {
+      "branchNaming": {
+        "status": "defined",
+        "value": "feature/<ticket>-<description>",
+        "sources": [
+          "CONTRIBUTING.md"
+        ]
+      },
+      "commitStyle": {
+        "status": "defined",
+        "value": "Conventional Commits",
+        "sources": [
+          "CONTRIBUTING.md",
+          "recent commit history"
+        ]
+      },
+      "directPush": {
+        "status": "defined",
+        "value": "Direct pushes to main are prohibited.",
+        "sources": [
+          "repository rules",
+          "team-lead confirmation"
+        ]
+      },
+      "pullRequests": {
+        "status": "defined",
+        "value": "One approval and passing CI are required.",
+        "sources": [
+          "repository rules"
+        ]
+      },
+      "commitSigning": {
+        "status": "none",
+        "reason": "The repository does not require signed commits.",
+        "sources": [
+          "team-lead confirmation"
+        ]
+      },
+      "ticketReferences": {
+        "status": "defined",
+        "value": "Include the ticket key in the branch name.",
+        "sources": [
+          "CONTRIBUTING.md"
+        ]
+      }
+    },
+    "sources": [
+      "CONTRIBUTING.md",
+      "repository rules",
+      "team-lead confirmation"
+    ]
+  },
+  "repositoryContext": {
+    "ciNotes": [
+      "GitHub Actions runs build and tests on pull requests."
+    ],
+    "complexModules": [],
+    "siblingRepositories": [],
+    "restrictedPaths": [
+      ".env"
+    ]
+  },
+  "generatedFiles": [
+    "AGENTS.md",
+    ".github/copilot-instructions.md",
+    ".github/instructions/tests.instructions.md"
+  ],
+  "pendingModules": []
+}

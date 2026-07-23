@@ -1,7 +1,7 @@
 # AKMaestro — Manual Walkthrough (setup + multi-repo)
 
 A hands-on guide to test the whole kit yourself: install it, run Stage 1
-(`/init`), and drive a Stage 2 feature that spans **three repos** — your main
+(`/akmaestro-init`), and drive a Stage 2 feature that spans **three repos** — your main
 app plus a sibling repository you own (modifiable) and one you only read.
 
 This is the human counterpart to `PROMPT.md` (which hands the checks to the
@@ -116,10 +116,10 @@ From inside `app-a/`:
 uvx --from git+https://github.com/AbbasKMoussa/akm-murex-starter-kit.git akmaestro init
 ```
 
-Expect a list of created files ending with "Next: … run /init". Confirm:
+Expect a list of created files ending with "Next: … run /akmaestro-init". Confirm:
 
 ```bash
-ls .github/skills            # 18 skill folders
+ls .github/skills            # 19 skill folders
 ls .agentic/hooks            # restricted-paths.txt, dangerous-commands.txt, editable-paths.txt, lint-commands.json
 cat .agentic/hooks/editable-paths.txt   # only comments so far — nothing outside the repo is writable yet
 ```
@@ -138,21 +138,23 @@ Sanity check that the kit is discoverable — ask:
 
 > what agentic skills are available here?
 
-You should see `/init`, `/doctor`, `/teach`, `/feature`, and the `setup-*` /
+You should see `/akmaestro-init`, `/doctor`, `/teach`, `/feature`, and the `setup-*` /
 `feature-*` / `story-*` skills.
 
 ---
 
-## Part 4 — Team lead runs `/init` and commits it
+## Part 4 — Team lead runs `/akmaestro-init` and commits it
 
 Run:
 
 ```text
-/init
+/akmaestro-init
 ```
 
-Walk the four topics. The **instructions** topic asks about *Workspace &
-Dependencies* — this is the multi-repo part. Answer:
+Walk the four topics. The **instructions** topic should first present one sourced
+summary of product, commands, verification, Git workflow, and repository
+context. Correct only what is wrong or missing. For *Workspace & Dependencies*,
+use:
 
 | Prompt | Your answer |
 |---|---|
@@ -163,9 +165,10 @@ Dependencies* — this is the multi-repo part. Answer:
 - **Tooling** topic: it will try to build a Graphifyy graph for app-a **and for
   each declared dependency** (lib-b and vendor-c). If graphify needs an API key
   and can't run, let it mark `blocked` and continue.
-- **Skills / Hooks**: accept the defaults. Install hooks when offered.
+- **Skills / Hooks**: verify the full catalog. Review hooks while they remain
+  disabled, then explicitly consent if you want the live hook checks.
 
-When `/init` finishes it writes `.github/AGENTIC.md` (the team guide) and a
+When `/akmaestro-init` finishes it writes `.github/AGENTIC.md` (the team guide) and a
 real `AGENTS.md`. **Verify the workspace was recorded correctly:**
 
 ```bash
@@ -177,6 +180,14 @@ git check-ignore .agentic/local/readiness.json     # MUST be ignored
 
 Also inspect `.agentic/setup/environment-requirements.json`: it should require
 `uv`, Graphifyy, the selected `lsp-*`, and graph artifacts for all three repos.
+Every graph path must be under app-a's
+`.agentic/local/graphs/<repository-id>/graph.json`; neither sibling may receive
+generated graph output.
+Inspect `.agentic/setup/instructions-state.json` too: it should contain strict
+product, all seven command definitions/results, verification, Git-policy,
+repository-context, and generated-file evidence. Confirm finite commands were
+checked through controller `action-check` and no placeholder remains in
+`AGENTS.md`.
 Review the shared diff and commit it. Do not add anything under `.agentic/local/`.
 
 > ✅ **Check 1 (the crux of the model):** `../lib-b` is in `editable-paths.txt`;
@@ -248,7 +259,7 @@ Expect that to **succeed**.
 ## Part 6 — Stage 2: a cross-repo feature
 
 Open a fresh **developer** session from the initialized commit. Do not rerun
-`/init`; run:
+`/akmaestro-init`; run:
 
 ```text
 /feature
@@ -257,7 +268,7 @@ Open a fresh **developer** session from the initialized commit. Do not rerun
 It must probe this developer's local requirements. If something is missing, it
 shows the structured remediation action and asks before running it. Decline once
 to confirm feature creation remains blocked, then approve/remediate and rerun.
-If Graphifyy was documented as blocked during `/init`, it must be made available
+If Graphifyy was documented as blocked during `/akmaestro-init`, it must be made available
 now; Stage 2 does not bypass mandatory developer readiness.
 
 Start a feature — title it **"tier discounts at checkout"**. Then walk the phases

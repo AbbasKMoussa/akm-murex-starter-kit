@@ -4,7 +4,7 @@
 
 A Murex-internal kit that bootstraps an existing repository for agentic coding
 with GitHub Copilot (VS Code + CLI), then drives features with a guided,
-BMAD-style flow — an orchestrator cueing a roster of specialist agents.
+BMAD-style flow with an orchestrator cueing focused, repo-local skills.
 
 - **Stage 1 — Setup (once per repo):** generate agent instructions, configure
   optional hooks, validate the bootstrapped skills, and verify tooling (LSP +
@@ -22,12 +22,14 @@ BMAD-style flow — an orchestrator cueing a roster of specialist agents.
   curl -LsSf https://astral.sh/uv/install.sh | sh                  # macOS/Linux
   ```
   ```powershell
-  powershell -c "irm https://astral.sh/uv/install.ps1 | iex"       # Windows
+  powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex" # Windows
   ```
+  See the [official uv installation guide](https://docs.astral.sh/uv/getting-started/installation/)
+  for package-manager alternatives.
 
 ## Install into a repo
 
-> Run from the **root of the repository you want to set up** — ideally a scratch
+> Run from the **Git root of the repository you want to set up** — ideally a scratch
 > repo or a throwaway branch the first time. The installer is non-destructive
 > (never overwrites existing files), but a branch keeps your diff clean.
 
@@ -37,11 +39,15 @@ Until the kit is on the internal registry, install straight from git:
 uvx --from git+https://github.com/AbbasKMoussa/akm-murex-starter-kit.git akmaestro init
 ```
 
+You do not need to clone AKMaestro. `uvx` builds and runs it directly from the
+Git URL. Use `--dry-run` first to preview every destination without writing.
+
 Use `--refresh` to pick up the latest version, `--no-hooks` to skip hooks,
 `--path <dir>` to target another directory. Once published to the registry this
 becomes simply `uvx akmaestro init`.
 
-The installer lays down all 18 skills, the optional hooks, minimal instruction
+The installer lays down all 19 skills, the optional hook files in a disabled
+state, minimal instruction
 pointers, schemas, and the repo-local deterministic state controller. Dynamic
 detection and configuration happen later inside Copilot.
 
@@ -59,8 +65,10 @@ is still byte-identical to what the kit installed (tracked via
 `.agentic/setup/kit-manifest.json`). Anything you customized — a tweaked skill,
 your `restricted-paths.txt`, your filled-in `AGENTS.md` — is kept and listed, so
 nothing you wrote is ever lost. `--force` overrides that for a file you want
-reset to the kit version. Review the diff, commit, and open a fresh Copilot
-session.
+reset to the kit version. Untouched retired kit files are removed, customized
+retired files are kept, and explicit hook enablement is preserved. Preview with
+`akmaestro update --dry-run`; then review the diff, commit, and open a fresh
+Copilot session.
 
 ## Important: open a fresh Copilot session
 
@@ -73,20 +81,27 @@ VS Code window or start a new CLI session at the repo root before continuing.
 The team lead opens a fresh Copilot session at the repo root:
 
 ```text
-/init
+/akmaestro-init
 ```
 
-(or say "let's run the initialization flow", or `init status` to see where you
-are). `/init` walks four topics — **instructions, tooling, skills, hooks** —
-asking targeted questions, generating repo-specific files, and verifying as it
-goes. It can span multiple sessions and resumes from where you left off. On
+(or say "let's run the initialization flow"; `/status` and
+`/akmaestro-init status` both show where you are). `/akmaestro-init` walks four
+topics — **instructions, tooling, skills, hooks** —
+detecting product, command, and Git facts with provenance, presenting one short
+confirmation summary, generating repo-specific files, and verifying finite
+commands without a shell. It can span multiple sessions and resumes from where
+you left off. On
 completion it writes **`.github/AGENTIC.md`**, a committed guide so every teammate
 knows what's installed and how to use it. Review and commit the resulting shared
-AKMaestro files. `/init` is repository initialization, not a per-developer step.
+AKMaestro files. `/akmaestro-init` is repository initialization, not a
+per-developer step. Hook files remain disabled until the lead reviews their
+behavior and explicitly consents during the optional hooks topic.
 
 Everyday helper skills included by the bootstrap (usable any time, not just in a
 flow):
 
+- **`/status`** — read-only orientation across initialization and feature work;
+  reports the active flow and one exact next action.
 - **`/teach`** — "remember that…" / "from now on…": routes a new rule to the right
   instruction file and refines the wording.
 - **`/doctor`** — health-check the agentic setup; `--fix` applies safe fixes.
@@ -101,12 +116,17 @@ session and starts directly with:
 ```
 
 Because it's a skill, natural language works too: *"start a feature"*, *"what's
-the status?"*, *"what should I do next?"*, *"resume the feature"*.
+the feature status?"*, *"what should I do next on this feature?"*, *"resume the
+feature"*.
+
+Use `/status` for an unqualified "where are we?". It automatically reports
+initialization until setup is complete, then local readiness and active feature
+progress. It does not change state or install anything.
 
 `/feature` checks the committed initialization and probes the current developer's
 `uv`, Graphifyy, selected LSPs, and graph artifacts. When something is missing it
 shows the structured remediation action and asks before changing the machine.
-Developers do not rerun `/init`.
+Developers do not rerun `/akmaestro-init`.
 
 It runs gated, BMAD-style phases, each a curated specialist:
 
@@ -134,7 +154,8 @@ How it behaves:
 
 ### Multi-repo workspaces
 
-If your app spans repos, declare local sibling-repository checkouts during `/init`
+If your app spans repos, declare local sibling-repository checkouts during
+`/akmaestro-init`
 (they land in `AGENTS.md` → Workspace & Dependencies), each with a role:
 
 - **Modifiable sibling repository** — a repo your team owns (e.g. `../lib-b`):
@@ -143,7 +164,9 @@ If your app spans repos, declare local sibling-repository checkouts during `/ini
   `.agentic/hooks/editable-paths.txt`, and its own build/test commands are honored.
 - **Read-only sibling repository** — another team's code (e.g. `../vendor-c`):
   indexed by Graphifyy/LSP so the agent understands it and read when needed, but
-  **never edited**. The restricted-path guard denies edits outside the main repo
+  **never edited**. Graphifyy reads it as a source but writes its index only
+  under the main repo's gitignored `.agentic/local/graphs/` tree. When hooks are
+  enabled, the restricted-path guard denies edits outside the main repo
   unless the target is a declared modifiable sibling repository.
 
 ### Optional: pull from Jira / wiki

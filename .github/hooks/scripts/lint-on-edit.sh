@@ -10,15 +10,73 @@
 # CLI does not always forward additionalContext into the context window (and not
 # at all for MCP tool calls), so findings may not always reach the agent.
 #
-# Runs the configured linter on the changed file and injects findings as context
-# so the agent can fix them. postToolUse cannot block, only inform. No-op when no
-# lint command is configured for the file's extension.
+# Runs a structured linter command directly (never through a shell) on the
+# changed file and injects bounded findings as context. postToolUse cannot block,
+# only inform. No-op when no linter is configured for the file's extension.
 #
 # SAFETY: always exit 0; emit nothing (no context) on any uncertainty.
 
 set -u
 
 noop() { exit 0; }
+
+normalize() {
+  local p="$1" out='' seg
+  case "$p" in /*) ;; *) p="$PWD/$p" ;; esac
+  local IFS='/'
+  for seg in $p; do
+    case "$seg" in
+      ''|'.') ;;
+      '..') out="${out%/*}" ;;
+      *) out="$out/$seg" ;;
+    esac
+  done
+  printf '%s' "${out:-/}"
+}
+
+# Resolve symlinks in the existing portion of a path, then append any
+# not-yet-created suffix. This also protects create events below symlinked dirs.
+canonicalize() {
+  local full probe suffix='' name parent resolved
+  full="$(normalize "$1")" || return 1
+  probe="$full"
+  while [ ! -e "$probe" ] && [ ! -L "$probe" ]; do
+    [ "$probe" = "/" ] && break
+    name="${probe##*/}"
+    suffix="/$name$suffix"
+    probe="${probe%/*}"; [ -n "$probe" ] || probe="/"
+  done
+  if command -v realpath >/dev/null 2>&1; then
+    resolved="$(realpath "$probe" 2>/dev/null)" || return 1
+  elif [ -L "$probe" ]; then
+    return 1
+  elif [ -d "$probe" ]; then
+    resolved="$(cd -P -- "$probe" 2>/dev/null && pwd -P)" || return 1
+  else
+    parent="$(cd -P -- "${probe%/*}" 2>/dev/null && pwd -P)" || return 1
+    resolved="$parent/${probe##*/}"
+  fi
+  printf '%s%s' "${resolved%/}" "$suffix"
+}
+
+is_allowed_path() {
+  local abs="$1" root entry base
+  root="$(canonicalize "$PWD")" || return 1
+  if [ "$abs" = "$root" ] || [[ "$abs" == "$root"/* ]]; then
+    return 0
+  fi
+  [ -f ".agentic/hooks/editable-paths.txt" ] || return 1
+  while IFS= read -r entry || [ -n "$entry" ]; do
+    case "$entry" in ''|\#*) continue;; esac
+    entry="${entry%$'\r'}"
+    base="$(canonicalize "$entry")" || continue
+    [ "$base" = "/" ] && continue
+    if [ "$abs" = "$base" ] || [[ "$abs" == "$base"/* ]]; then
+      return 0
+    fi
+  done < ".agentic/hooks/editable-paths.txt"
+  return 1
+}
 
 command -v jq >/dev/null 2>&1 || noop
 
@@ -32,22 +90,41 @@ path="$(printf '%s' "$payload" | jq -r '
   | ($args.path // $args.file_path // $args.filePath // $args.filename // $args.file // empty)
 ' 2>/dev/null)" || noop
 [ -n "$path" ] && [ "$path" != "null" ] || noop
-[ -f "$path" ] || noop
+case "$path" in *$'\n'*|*$'\r'*) noop;; esac
+abs="$(canonicalize "$path")" || noop
+is_allowed_path "$abs" || noop
+[ -f "$abs" ] || noop
 
 map=".agentic/hooks/lint-commands.json"
 [ -f "$map" ] || noop
 
-ext="${path##*.}"
-template="$(jq -r --arg e "$ext" '.[$e] // empty' "$map" 2>/dev/null)" || noop
-[ -n "$template" ] && [ "$template" != "null" ] || noop
+ext="${abs##*.}"
+entry="$(jq -c --arg e "$ext" '
+  .[$e]
+  | select(type == "object")
+  | select(.command | type == "string")
+  | select(.args | type == "array" and all(.[]; type == "string"))
+  | select(any(.args[]; contains("{file}")))
+' "$map" 2>/dev/null)" || noop
+[ -n "$entry" ] && [ "$entry" != "null" ] || noop
 
-# Substitute the {file} placeholder with the shell-quoted path.
-qpath="$(printf '%q' "$path")"
-cmd="${template//\{file\}/$qpath}"
+executable="$(printf '%s' "$entry" | jq -r '.command' 2>/dev/null)" || noop
+case "$executable" in
+  ''|*/*|*\\*|sh|bash|dash|zsh|fish|cmd|cmd.exe|powershell|powershell.exe|pwsh|pwsh.exe) noop;;
+  *[!A-Za-z0-9._+-]*) noop;;
+esac
+command -v "$executable" >/dev/null 2>&1 || noop
 
-out="$(eval "$cmd" 2>&1)"; status=$?
+args=()
+while IFS= read -r encoded; do
+  arg="$(printf '%s' "$encoded" | jq -r '.' 2>/dev/null)" || noop
+  args+=("${arg//\{file\}/$abs}")
+done < <(printf '%s' "$entry" | jq -c '.args[]' 2>/dev/null)
+
+out="$("$executable" "${args[@]}" 2>&1)"; status=$?
 [ "$status" -eq 0 ] && noop   # clean: nothing to inject
+out="${out:0:20000}"
 
-printf '%s' "Lint findings for $path (exit $status):
+printf '%s' "Lint findings for $abs (exit $status):
 $out" | jq -Rsc '{additionalContext: .}'
 exit 0

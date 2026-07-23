@@ -13,9 +13,9 @@
 #   2. Restricted globs — edits matching .agentic/hooks/restricted-paths.txt are
 #      denied, in-repo and inside modifiable sibling repositories alike.
 #
-# SAFETY: always exit 0; default to allow on any parsing uncertainty; deny only
-# on a positive match (a restricted glob, or a path positively outside the
-# declared workspace).
+# SAFETY: always exit 0. Unknown payloads are allowed, but a parsed edit path is
+# denied unless its canonical location is inside a declared writable root.
+# Existing symlinks and junctions are resolved before boundary checks.
 
 $ErrorActionPreference = 'SilentlyContinue'
 
@@ -25,13 +25,50 @@ function Deny([string]$reason) {
   exit 0
 }
 
-function Normalize([string]$p) {
-  if (-not [System.IO.Path]::IsPathRooted($p)) {
-    $p = Join-Path (Get-Location).Path $p
+function Canonicalize([string]$p) {
+  $full = [System.IO.Path]::GetFullPath($(if ([System.IO.Path]::IsPathRooted($p)) {
+    $p
+  } else {
+    Join-Path (Get-Location).Path $p
+  }))
+  $volume = [System.IO.Path]::GetPathRoot($full)
+  $current = $volume.TrimEnd(
+    [System.IO.Path]::DirectorySeparatorChar,
+    [System.IO.Path]::AltDirectorySeparatorChar
+  )
+  if ([string]::IsNullOrEmpty($current)) { $current = $volume }
+  $rest = $full.Substring($volume.Length)
+  $segments = $rest.Split(
+    @([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar),
+    [System.StringSplitOptions]::RemoveEmptyEntries
+  )
+  foreach ($segment in $segments) {
+    $candidate = Join-Path $current $segment
+    $item = Get-Item -LiteralPath $candidate -Force -ErrorAction SilentlyContinue
+    if ($item -and $item.LinkType) {
+      $method = $item.GetType().GetMethod('ResolveLinkTarget', @([bool]))
+      if (-not $method) { throw "Link resolution unavailable" }
+      $target = $item.ResolveLinkTarget($true)
+      if (-not $target) { throw "Link target unavailable" }
+      $current = $target.FullName
+    } else {
+      $current = $candidate
+    }
   }
-  # GetFullPath resolves '.' and '..' textually; it does not require the path
-  # to exist and does not resolve symlinks.
-  return [System.IO.Path]::GetFullPath($p).TrimEnd([System.IO.Path]::DirectorySeparatorChar)
+  $trimmed = [System.IO.Path]::GetFullPath($current).TrimEnd('\', '/')
+  if ([string]::IsNullOrEmpty($trimmed)) { return $volume }
+  return $trimmed
+}
+
+function Is-Within([string]$path, [string]$root) {
+  $comparison = if ($IsWindows -or $env:OS -eq 'Windows_NT') {
+    [System.StringComparison]::OrdinalIgnoreCase
+  } else {
+    [System.StringComparison]::Ordinal
+  }
+  if ([string]::Equals($path, $root, $comparison)) { return $true }
+  $prefix = $root.TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
+  return $path.StartsWith($prefix, $comparison)
 }
 
 # Deny if $rel (forward-slash path relative to its repository root) matches
@@ -79,14 +116,18 @@ try {
   if (-not $path) { $path = $a.filename }
   if (-not $path) { $path = $a.file }
   if (-not $path) { Allow }
+  if ($path.Contains("`n") -or $path.Contains("`r")) {
+    Deny "Edit path contains unsupported control characters."
+  }
   $path = $path -replace '^\./', ''
 
-  $root = Normalize '.'
-  $abs = Normalize $path
-  if ($null -eq $abs -or $abs -eq '') { Allow }
+  $root = Canonicalize '.'
+  try { $abs = Canonicalize $path } catch {
+    Deny "Edit to '$path' is blocked because its canonical path could not be resolved safely."
+  }
 
   # Inside the repository: restricted globs on the repo-relative path.
-  if ($abs -eq $root -or $abs.StartsWith($root + [System.IO.Path]::DirectorySeparatorChar) -or $abs.StartsWith($root + '/')) {
+  if (Is-Within $abs $root) {
     Test-RestrictedGlobs (To-Rel $abs $root)
     Allow
   }
@@ -98,9 +139,9 @@ try {
     foreach ($entry in Get-Content $editsFile) {
       $e = $entry.Trim()
       if ($e -eq '' -or $e.StartsWith('#')) { continue }
-      $base = Normalize $e
+      try { $base = Canonicalize $e } catch { continue }
       if ($null -eq $base -or $base -eq '' -or $base -eq [System.IO.Path]::GetPathRoot($base)) { continue }
-      if ($abs -eq $base -or $abs.StartsWith($base + [System.IO.Path]::DirectorySeparatorChar) -or $abs.StartsWith($base + '/')) {
+      if (Is-Within $abs $base) {
         Test-RestrictedGlobs (To-Rel $abs $base)
         Allow
       }
