@@ -38,10 +38,11 @@ function Canonicalize([string]$p) {
   )
   if ([string]::IsNullOrEmpty($current)) { $current = $volume }
   $rest = $full.Substring($volume.Length)
-  $segments = $rest.Split(
-    @([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar),
-    [System.StringSplitOptions]::RemoveEmptyEntries
+  [char[]]$separators = @(
+    [System.IO.Path]::DirectorySeparatorChar,
+    [System.IO.Path]::AltDirectorySeparatorChar
   )
+  $segments = $rest.Split($separators, [System.StringSplitOptions]::RemoveEmptyEntries)
   foreach ($segment in $segments) {
     $candidate = Join-Path $current $segment
     $item = Get-Item -LiteralPath $candidate -Force -ErrorAction SilentlyContinue
