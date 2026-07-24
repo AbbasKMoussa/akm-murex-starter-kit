@@ -134,6 +134,29 @@ def test_status_skill_is_read_only_universal_orientation():
     assert "Do not execute or delegate" in text
 
 
+def test_init_skills_define_controller_bound_module_knowledge_flow():
+    setup = (ASSETS / "skills" / "setup-instructions" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    init = (ASSETS / "skills" / "akmaestro-init" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    status = (ASSETS / "skills" / "status" / "SKILL.md").read_text(encoding="utf-8")
+    doctor = (ASSETS / "skills" / "doctor" / "SKILL.md").read_text(encoding="utf-8")
+    protocol = (ASSETS / "runtime" / "STATE-PROTOCOL.md").read_text(encoding="utf-8")
+
+    assert "Generate scoped knowledge for all selected modules now?" in setup
+    assert "module-targets" in setup
+    assert "generate_now" in setup and "defer" in setup
+    assert "source" in setup and "confidence" in setup
+    assert "parent/child" in setup
+    assert "declining" in setup and "pending" in setup
+    assert "accepted module generation" in init
+    assert "moduleKnowledge" in status
+    assert "generate_now" in doctor
+    assert "moduleKnowledge" in protocol
+
+
 def test_subproject_scope_guidance_is_bundled():
     protocol = (ASSETS / "runtime" / "STATE-PROTOCOL.md").read_text(encoding="utf-8")
     init_skill = (ASSETS / "skills" / "akmaestro-init" / "SKILL.md").read_text(

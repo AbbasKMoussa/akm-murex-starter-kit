@@ -56,10 +56,17 @@ Do not inspect workflow state when the user asks only for help.
    with `/doctor` as the next action; never infer setup progress from files by
    hand.
 3. If setup is incomplete, report the active flow as **setup**, show all four
-   topics and blocker reasons, print the controller's `nextCommand`, point to
-   `/akmaestro-init help`, and stop. Do not inspect readiness or features.
-4. If setup is complete, summarize it on one line and report any blocked topics
-   as durable follow-ups. Then run `readiness-check --no-write`:
+   topics and blocker reasons, and report the controller-returned
+   `moduleKnowledge` decision plus completed and pending module counts when it
+   is present. During `generate_now` with pending modules, print exactly one
+   `Next: /akmaestro-init` line. Otherwise print the controller's `nextCommand`,
+   point to `/akmaestro-init help`, and stop. Do not inspect readiness or
+   features.
+4. If setup is complete, summarize it on one line, report any blocked topics as
+   durable follow-ups, and report `moduleKnowledge` with completed/pending
+   counts. For `defer`, list each pending module and its controller-returned
+   follow-up command without making it the active `Next:` action. Then run
+   `readiness-check --no-write`:
    - Exit `0` means ready.
    - Exit `3` means local prerequisites are missing: summarize every missing
      requirement and its recorded remediation action, but do not run it.
@@ -80,7 +87,8 @@ Do not inspect workflow state when the user asks only for help.
 Print exactly one `Next:` line:
 
 1. Incomplete setup: use the `setup-status` `nextCommand` and identify the team
-   lead as owner.
+   lead as owner. Accepted `generate_now` work always has
+   `Next: /akmaestro-init`.
 2. Unreadable or invalid workflow state: `/doctor`.
 3. Missing local readiness: `/feature` to review and confirm remediation. If
    the readiness probe itself failed or was unverifiable, use `/doctor`.
@@ -109,4 +117,5 @@ Help: /feature help | Health: /doctor
 ```
 
 When setup is active, replace the feature fields with the four setup-topic
-statuses and end with `Help: /akmaestro-init help | Health: /doctor`.
+statuses, include `Module knowledge  <decision> (<completed>/<total> complete)`,
+and end with `Help: /akmaestro-init help | Health: /doctor`.

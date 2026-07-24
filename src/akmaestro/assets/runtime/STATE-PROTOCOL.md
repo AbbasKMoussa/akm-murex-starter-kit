@@ -90,6 +90,39 @@ Existing instruction and hook files use `merge-plan` followed by
 proposed content reviewed by the user. `setup-finalize --preview` provides the
 same read-only diff before an unowned `.github/AGENTIC.md` may be replaced.
 
+## Module knowledge
+
+Instructions evidence records a required `moduleKnowledge.decision`:
+
+- `generate_now`: the lead accepted generation for every confirmed complex
+  module. All begin in `pendingModules`, and the controller refuses to complete
+  instructions until none remain.
+- `defer`: confirmed modules may remain pending while instructions completes.
+  The controller retains a follow-up command for each.
+- `not_applicable`: both confirmed complex modules and `pendingModules` must be
+  empty.
+
+Pass the full confirmed module list to `module-targets`; its returned mapping is
+the only filename authority. Every completed module needs the exact
+`applyTo: "<module-path>/**"` scope and the seven required sections: Purpose,
+Boundaries, Commands, Important Paths, Patterns, Pitfalls, and Restrictions.
+Existing targets still use the reviewed merge protocol.
+
+Process pending modules in normalized path order. For each artifact, submit the
+prepared `generatedFiles` and `pendingModules` revision through `evidence-write
+instructions --input <local-evidence-json> --expected-revision
+<latest-evidence-revision>`. A successful write validates the artifact and is
+atomic, so an invalid artifact leaves the prior revision resumable.
+`setup-status` returns `moduleKnowledge` with completed and pending module lists
+plus a controller-derived pending-item command for each remaining module.
+
+When `generate_now` remains pending, instructions stays `in_progress`,
+`setup-status.nextCommand` remains `/akmaestro-init`, and that is the only
+cross-session resume command. Accepted generation may change to `defer` only
+after explicit lead confirmation and a new evidence revision. Deferred
+post-setup work uses each returned `/setup-instructions module <path>` command
+and does not reopen the completed setup topic.
+
 ## Repository and developer readiness
 
 `/akmaestro-init` is run once by the team lead. Its committed completion state is the

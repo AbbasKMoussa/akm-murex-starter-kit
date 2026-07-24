@@ -68,6 +68,10 @@ Do not restart completed topics automatically.
    ask before archiving/removing it; there is no migration because no earlier
    state contract shipped to users.
 2. Run `setup-status` and retain its revision and controller-derived next action.
+   Whenever instructions is `in_progress`, inspect the returned
+   `moduleKnowledge`. If its decision is `generate_now` and modules remain
+   pending, resume the first controller-returned pending module by following
+   `setup-instructions`; do not select or reorder modules yourself.
 3. Refresh committed `.agentic/setup/detected-repo.json` with **stable repository
    facts only**: product purpose/consumers/workflows, languages/frameworks,
    package managers, bootstrap/build/test/lint/typecheck/run/verify commands,
@@ -87,6 +91,8 @@ Do not restart completed topics automatically.
 5. Each topic writes its evidence before its terminal transition. After it
    returns, rerun `setup-status`; never calculate the next topic yourself. Keep
    following installed topic skills in controller order in the same session.
+   Never advance or finalize while accepted module generation (`generate_now`)
+   still has a pending module.
 6. Restart only when an installed tool cannot be observed by the current process
    or the current Copilot surface requires a reload. Before stopping, persist all
    evidence and leave the current topic resumable. Print exactly:
@@ -113,7 +119,9 @@ Do not restart completed topics automatically.
    returned diff, ask for explicit confirmation, and only then rerun without
    `--preview` and with `--approved-guide-replace`. Never pass that approval flag
    without confirmation of the previewed diff.
-8. Print the exact returned inventory and handoff. Do not commit automatically.
+8. Print the exact returned inventory and handoff. For `defer`, include every
+   controller-returned pending module command verbatim. Do not commit
+   automatically.
 
 ## Final report
 
@@ -136,7 +144,7 @@ Blocked follow-ups
 - <item, owner, and remediation; or none>
 
 Pending recommendations
-- <module-scoped instructions or other non-blocking work; or none>
+- <controller-returned deferred module command or other non-blocking work; or none>
 
 Validation: passed
 Next: review the shared diff and commit the initialization.

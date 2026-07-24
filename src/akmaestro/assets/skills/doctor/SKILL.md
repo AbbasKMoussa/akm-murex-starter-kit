@@ -75,8 +75,18 @@ fix when not `ok`.
   canonical sources).
 - `.github/instructions/tests.instructions.md` exists with an `applyTo`
   frontmatter line.
-- Read `.agentic/setup/instructions-state.json`; any complex modules still marked
-  pending → **warn** with `/setup-instructions module <path>`.
+- Read `moduleKnowledge` from validated instructions evidence and use the
+  controller's `setup-status` module inventory:
+  - `generate_now` with pending modules while instructions is `in_progress` →
+    **warn** as unfinished setup; fix with `/akmaestro-init`.
+  - `generate_now` with pending modules while instructions is `complete` →
+    **fail** as invalid controller state.
+  - `defer` with pending modules → **warn** and print each controller-returned
+    follow-up command.
+  - `not_applicable` with any confirmed or pending module → **fail** contract
+    validation.
+  Completed module artifacts must use their exact module `applyTo` scope and all
+  seven controller-required sections; validation errors are **fail**.
 
 ### 3. Tooling
 
@@ -188,7 +198,7 @@ controller-owned state to silence a validation failure.
 doctor — agentic setup health
 
 Environment   ok    bash, jq, git, uv present; graphify 1.x
-Instructions  warn  backend/auth module still pending (/setup-instructions module backend/auth)
+Instructions  warn  deferred backend/auth module (/setup-instructions module backend/auth)
 Tooling       ok    graphify graph present; pyright 1.x
 Skills        ok    all 19 bundled skills valid
 Hooks         fail  restricted-path-guard allow-path returned deny (logic bug)

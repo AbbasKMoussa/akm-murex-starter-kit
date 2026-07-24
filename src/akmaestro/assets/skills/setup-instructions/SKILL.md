@@ -29,8 +29,11 @@ Read `.agentic/STATE-PROTOCOL.md`. Run `setup-init` and `setup-status` through:
 uv run --no-project python .agentic/bin/akmaestro-state.py <command>
 ```
 
-If this topic is not `in_progress`, transition it with the revision just read.
-Never edit aggregate state or committed evidence directly.
+For the main instructions topic, transition it to `in_progress` with the
+revision just read when required. Never edit aggregate state or committed
+evidence directly. A deferred `module <path>` follow-up may revise instructions
+evidence after the topic is complete; it does not reopen or hand-edit the setup
+topic.
 
 ## 1. Detect with provenance
 
@@ -81,9 +84,12 @@ Git workflow
 
 Repository context
 | Item | Proposed value | Source | Confidence |
-| Complex modules | services/pricing | architecture docs | medium |
 | Restricted paths | .env; secrets/** | existing instructions | high |
 | Siblings | ../pricing-lib (modifiable) | workspace + lead | medium |
+
+Module candidates
+| Path | Purpose | Source | Confidence | Existing scope |
+| services/pricing | Pricing rules and quote calculation. | docs/architecture.md | medium | none |
 
 Confirm the proposal or correct only the rows that are wrong or uncertain.
 ```
@@ -113,7 +119,34 @@ role: **modifiable** (owned by this team and changeable here) or **read-only**
 repository. Add only modifiable sibling paths to
 `.agentic/hooks/editable-paths.txt`.
 
-## 3. Generate non-destructively
+## 3. Confirm module knowledge
+
+Detect complex-module candidates from architecture documents, manifests, code
+entry points, tests, CI, and existing scoped instructions. Within the single
+sourced summary, present one table with each candidate's normalized
+product-relative path, purpose, strongest source, `high`/`medium`/`low`
+confidence, and existing `applyTo` scope. Obtain one corrected, confirmed
+selection rather than accepting detection silently.
+
+Flag every parent/child overlap, explain that both scopes may apply, and require
+explicit overlap confirmation. Confirm that any removed candidate is a false
+positive or intentionally outside the product's module-knowledge scope. When
+the confirmed selection is empty, record `moduleKnowledge.decision` as
+`not_applicable` and keep `complexModules` and `pendingModules` empty.
+
+For a non-empty confirmed selection, ask exactly:
+
+```text
+Generate scoped knowledge for all selected modules now?
+```
+
+An affirmative answer records `generate_now`; declining records `defer`.
+Initially, every selected module is pending under either decision. Persist this
+decision and the confirmed modules in the first instructions evidence revision.
+Do not treat `defer` as `not_applicable`, and do not silently change an accepted
+decision because generation later stops.
+
+## 4. Generate root instructions non-destructively
 
 Create or section-merge:
 
@@ -145,7 +178,7 @@ uv run --no-project python .agentic/bin/akmaestro-state.py merge-apply --plan-id
 Never pass `--approved` before confirmation. If the target changes after review,
 discard the plan, regenerate the proposal, and show a new diff.
 
-## 4. Check commands safely
+## 5. Check commands safely
 
 Represent every action as a JSON argument array with optional repository-relative
 `cwd`, `label`, and `timeoutSeconds`; never store a shell command string. Before
@@ -173,7 +206,7 @@ startup plus health check when the repository provides one. Record manual
 verification as explicit ordered steps. Never record credentials or full command
 output in committed evidence.
 
-## 5. Persist strict evidence
+## 6. Persist strict evidence
 
 Use `references/instructions-evidence.example.json` as the structural example.
 Replace every example value and check record with this repository's confirmed
@@ -189,6 +222,8 @@ Build the local JSON input for `evidence-write instructions` with exactly:
 - `gitWorkflow`: `baseBranch`, all six policies, and sources;
 - `repositoryContext`: CI notes, complex modules, sibling repositories, and
   restricted paths;
+- `moduleKnowledge`: the confirmed `generate_now`, `defer`, or `not_applicable`
+  decision;
 - `generatedFiles` and `pendingModules`.
 
 Write it atomically:
@@ -201,22 +236,63 @@ The controller rejects incomplete answers, unsafe command strings, omitted or
 substituted action checks, mismatched command results, missing verification,
 missing/placeholder artifacts, and Git policies that were never answered.
 
-## Module sub-actions
+## 7. Generate selected module knowledge
 
-`module <path>` or `module all`: detect module facts first, then show one compact
-draft covering purpose, boundaries, commands, important paths, patterns,
-pitfalls, and restrictions. Ask only about gaps. By default generate:
+Whenever generating module knowledge, pass the full confirmed list to the
+controller and use its returned mapping as the sole source of filenames:
 
 ```text
-.github/instructions/<module-id>.instructions.md
+uv run --no-project python .agentic/bin/akmaestro-state.py module-targets --input <local-modules-json>
 ```
 
-Its YAML frontmatter must contain an `applyTo` glob scoped to that module. The
-body documents only what differs from root instructions. If the lead explicitly
-asks for a cross-agent file, generate `<module>/AGENTS.md` instead or alongside
-it. Show and confirm changes to any existing file. Remove the module from
-`pendingModules` through a new instructions-evidence revision; do not create a
-second ad hoc module-status source.
+The input is exactly `{"modules": ["<normalized-path>", ...]}`. Process pending
+modules in normalized path order. The mapping handles existing exact scopes and
+filename collisions; never derive or substitute a target yourself. On a resumed
+accepted run, use the first controller-returned pending module from
+`setup-status`; the only cross-session resume command is `/akmaestro-init`.
+
+For each pending module, inspect its documentation, manifests, entry points,
+tests, CI, and existing instructions. Present one compact sourced draft and ask
+only about missing, conflicting, or low-confidence facts. The controller target
+must have this exact scope and these seven second-level sections:
+
+```markdown
+---
+applyTo: "<module-path>/**"
+---
+
+# <Module name>
+
+## Purpose
+## Boundaries
+## Commands
+## Important Paths
+## Patterns
+## Pitfalls
+## Restrictions
+```
+
+Every section must contain confirmed, module-specific guidance and no
+placeholder. State explicitly when a section has no module-specific difference
+from root guidance; do not duplicate that general guidance. A nested
+`<module>/AGENTS.md` is a separate, explicitly requested cross-agent artifact;
+it may accompany but never replace the controller-targeted scoped file.
+
+Create a missing target directly. For an existing target, use `merge-plan`,
+show the exact diff, and call `merge-apply --approved` only after approval.
+Declining an existing-file merge leaves that module pending. It does not alter
+`moduleKnowledge.decision`.
+
+For each scoped artifact, prepare the next evidence input by appending its
+returned target to `generatedFiles` and removing only that module from
+`pendingModules`. Call `evidence-write instructions` with the latest evidence
+revision; only a successful controller write marks that artifact validated and
+advances the evidence revision. Never batch an unvalidated artifact into
+evidence or maintain another module-status file. If the lead no longer accepts
+generation now, explicitly confirm changing `generate_now` to `defer`, write
+that new evidence revision, and only then allow the topic to complete. The
+controller-returned `/setup-instructions module <path>` commands remain the
+deferred follow-ups for `module <path>` or `module all`.
 
 ## Completion
 
@@ -226,9 +302,15 @@ canonical command has an explicit disposition; configured finite checks passed
 or have documented environmental blockers; at least one verification path
 exists; and every Git policy is defined or explicitly absent/unspecified.
 
-Pending module-scoped files are warnings, not blockers. Write evidence first, then make
-the final aggregate transition using the latest revision. If any command result
-is `blocked`, transition instructions to `blocked --reason <reason>`; otherwise
-transition to `complete`. Rerun `setup-status` and return to the orchestrator,
-which loads the next installed topic skill in the same session. If a restart is
-genuinely required, the only resume command is `/akmaestro-init`.
+With `generate_now`, pending modules are unfinished accepted work and the
+controller rejects instructions completion. With `defer`, pending modules are
+non-blocking follow-ups. With `not_applicable`, both confirmed and pending module
+lists must be empty.
+
+Write evidence first, then make the final aggregate transition using the latest
+setup-state revision. If any command result is `blocked`, transition
+instructions to `blocked --reason <reason>`; otherwise transition to `complete`
+only after the controller accepts it. Rerun `setup-status` and return to the
+orchestrator, which loads the next installed topic skill in the same session.
+If a restart is genuinely required, the only resume command is
+`/akmaestro-init`.
