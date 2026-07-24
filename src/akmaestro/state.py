@@ -93,6 +93,7 @@ INSTRUCTION_GIT_POLICIES = (
     "commitSigning",
     "ticketReferences",
 )
+MODULE_KNOWLEDGE_DECISIONS = {"generate_now", "defer", "not_applicable"}
 INSTRUCTION_FILES = (
     "AGENTS.md",
     ".github/copilot-instructions.md",
@@ -379,6 +380,19 @@ def _validate_workspace_path(value: str, label: str) -> None:
     path = PurePosixPath(value)
     if path.is_absolute():
         raise StateError(f"{label} must be relative to the repository: {value!r}")
+
+
+def _validate_module_path(value: str, label: str) -> None:
+    _validate_workspace_path(value, label)
+    normalized = PurePosixPath(value)
+    if (
+        value == "."
+        or normalized.as_posix() != value
+        or any(part in {".", ".."} for part in normalized.parts)
+    ):
+        raise StateError(
+            f"{label} must be a normalized complex module path inside the product"
+        )
 
 
 def _declared_workspace_roots(root: Path, include_read_only: bool) -> List[Path]:
@@ -971,6 +985,7 @@ def validate_instructions_evidence(evidence: Dict[str, Any]) -> None:
             "manualVerification",
             "gitWorkflow",
             "repositoryContext",
+            "moduleKnowledge",
             "generatedFiles",
             "pendingModules",
         ),
@@ -985,6 +1000,7 @@ def validate_instructions_evidence(evidence: Dict[str, Any]) -> None:
             "manualVerification",
             "gitWorkflow",
             "repositoryContext",
+            "moduleKnowledge",
             "generatedFiles",
             "pendingModules",
         ),
@@ -1137,7 +1153,7 @@ def validate_instructions_evidence(evidence: Dict[str, Any]) -> None:
             raise StateError(f"{label} must be an object")
         _require_keys(module, ("path", "purpose"), label)
         _only_keys(module, ("path", "purpose"), label)
-        _validate_workspace_path(module["path"], f"{label}.path")
+        _validate_module_path(module["path"], f"complex module path at {label}.path")
         _require_nonempty_text(module["purpose"], f"{label}.purpose")
         if module["path"] in module_paths:
             raise StateError(f"duplicate complex module path: {module['path']}")
@@ -1196,11 +1212,35 @@ def validate_instructions_evidence(evidence: Dict[str, Any]) -> None:
     if len(set(pending)) != len(pending):
         raise StateError("instructions evidence.pendingModules contains duplicates")
     for index, path in enumerate(pending):
-        _validate_workspace_path(path, f"instructions evidence.pendingModules[{index}]")
+        _validate_module_path(
+            path,
+            f"complex module path at instructions evidence.pendingModules[{index}]",
+        )
         if path not in module_paths:
             raise StateError(
                 f"pending module is not declared as a complex module: {path}"
             )
+
+    module_knowledge = evidence["moduleKnowledge"]
+    if not isinstance(module_knowledge, dict):
+        raise StateError("instructions evidence.moduleKnowledge must be an object")
+    _require_keys(module_knowledge, ("decision",), "moduleKnowledge")
+    _only_keys(module_knowledge, ("decision",), "moduleKnowledge")
+    decision = module_knowledge["decision"]
+    if decision not in MODULE_KNOWLEDGE_DECISIONS:
+        raise StateError(
+            "moduleKnowledge.decision must be 'generate_now', 'defer', or "
+            "'not_applicable'"
+        )
+    if decision == "not_applicable" and (module_paths or pending):
+        raise StateError(
+            "moduleKnowledge not_applicable requires no complex modules or "
+            "pending modules"
+        )
+    if decision in {"generate_now", "defer"} and not module_paths:
+        raise StateError(
+            f"moduleKnowledge {decision} requires at least one complex module"
+        )
 
 
 def _instructions_have_blockers(evidence: Dict[str, Any]) -> bool:

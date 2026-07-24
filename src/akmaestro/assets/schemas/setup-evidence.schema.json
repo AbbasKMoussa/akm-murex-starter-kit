@@ -556,6 +556,7 @@
         "manualVerification",
         "gitWorkflow",
         "repositoryContext",
+        "moduleKnowledge",
         "generatedFiles",
         "pendingModules"
       ],
@@ -735,6 +736,16 @@
             },
             "restrictedPaths": {
               "$ref": "#/$defs/optionalStringArray"
+            }
+          }
+        },
+        "moduleKnowledge": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["decision"],
+          "properties": {
+            "decision": {
+              "enum": ["generate_now", "defer", "not_applicable"]
             }
           }
         },

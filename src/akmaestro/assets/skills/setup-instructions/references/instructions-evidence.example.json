@@ -249,6 +249,9 @@
       ".env"
     ]
   },
+  "moduleKnowledge": {
+    "decision": "not_applicable"
+  },
   "generatedFiles": [
     "AGENTS.md",
     ".github/copilot-instructions.md",

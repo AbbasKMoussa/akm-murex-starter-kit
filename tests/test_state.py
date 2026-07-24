@@ -172,6 +172,7 @@ def _instructions_evidence(root, blocked_command=None):
             "siblingRepositories": [],
             "restrictedPaths": [],
         },
+        "moduleKnowledge": {"decision": "not_applicable"},
         "generatedFiles": list(state.INSTRUCTION_FILES),
         "pendingModules": [],
     }
@@ -606,6 +607,51 @@ def test_bundled_instruction_evidence_example_matches_controller_and_schema():
     Draft202012Validator(schema, format_checker=FormatChecker()).validate(envelope)
 
 
+@pytest.mark.parametrize("decision", ("generate_now", "defer"))
+def test_module_knowledge_active_decisions_require_confirmed_modules(
+    tmp_path, decision
+):
+    body = _instructions_evidence(tmp_path)
+    body["moduleKnowledge"] = {"decision": decision}
+    with pytest.raises(state.StateError, match="requires at least one complex module"):
+        state.validate_instructions_evidence(body)
+
+
+def test_module_knowledge_not_applicable_requires_empty_module_lists(tmp_path):
+    body = _instructions_evidence(tmp_path)
+    body["repositoryContext"]["complexModules"] = [
+        {"path": "services/payments", "purpose": "Payment processing"}
+    ]
+    body["pendingModules"] = ["services/payments"]
+    with pytest.raises(
+        state.StateError, match="not_applicable requires no complex modules"
+    ):
+        state.validate_instructions_evidence(body)
+
+
+@pytest.mark.parametrize(
+    "module_path",
+    (
+        "../outside",
+        "services/../outside",
+        "/absolute",
+        "C:/absolute",
+        r"services\payments",
+    ),
+)
+def test_complex_module_paths_must_be_normalized_product_relative_paths(
+    tmp_path, module_path
+):
+    body = _instructions_evidence(tmp_path)
+    body["moduleKnowledge"] = {"decision": "defer"}
+    body["repositoryContext"]["complexModules"] = [
+        {"path": module_path, "purpose": "Unsafe fixture"}
+    ]
+    body["pendingModules"] = [module_path]
+    with pytest.raises(state.StateError, match="complex module path"):
+        state.validate_instructions_evidence(body)
+
+
 def test_instruction_action_check_uses_argument_arrays_without_a_shell(tmp_path):
     action = {
         "command": [
@@ -737,6 +783,7 @@ def test_module_instruction_claims_require_existing_scoped_apply_to(tmp_path):
     body["repositoryContext"]["complexModules"] = [
         {"path": "src/payments", "purpose": "Payment processing"}
     ]
+    body["moduleKnowledge"] = {"decision": "generate_now"}
     body["generatedFiles"].append(".github/instructions/payments.instructions.md")
 
     with pytest.raises(state.StateError, match="must be written before advancing"):
