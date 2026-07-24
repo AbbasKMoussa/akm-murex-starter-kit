@@ -650,6 +650,19 @@ def test_module_knowledge_not_applicable_requires_empty_module_lists(tmp_path):
         "/absolute",
         "C:/absolute",
         r"services\payments",
+        "services/pay*ments",
+        "services/pay?ments",
+        "services/pay[ments",
+        "services/pay]ments",
+        "services/pay{ments",
+        "services/pay}ments",
+        "services/pay,ments",
+        "services/pay!ments",
+        "services/pay'ments",
+        'services/pay"ments',
+        "services/pay\rments",
+        "services/pay\nments",
+        "services/pay\tments",
     ),
 )
 def test_complex_module_paths_must_be_normalized_product_relative_paths(
@@ -663,6 +676,19 @@ def test_complex_module_paths_must_be_normalized_product_relative_paths(
     body["pendingModules"] = [module_path]
     with pytest.raises(state.StateError, match="complex module path"):
         state.validate_instructions_evidence(body)
+
+
+def test_global_glob_cannot_be_accepted_as_a_module_path(tmp_path):
+    with pytest.raises(state.StateError, match="complex module path"):
+        state.module_instruction_targets(tmp_path, ["**"])
+
+
+def test_normalized_product_relative_module_path_remains_valid(tmp_path):
+    assert state.module_instruction_targets(tmp_path, ["products/payment-api_v2"]) == {
+        "products/payment-api_v2": (
+            ".github/instructions/products-payment-api-v2.instructions.md"
+        )
+    }
 
 
 def test_module_instruction_targets_are_readable_stable_and_collision_safe(tmp_path):
@@ -709,6 +735,49 @@ def test_module_instruction_targets_hash_an_occupied_mismatched_target(tmp_path)
     assert result["services/payments"].endswith(
         f"services-payments-{digest}.instructions.md"
     )
+
+
+def test_module_instruction_targets_hash_case_insensitive_occupied_mismatch(tmp_path):
+    target = tmp_path / ".github" / "instructions" / "SERVICES-PAYMENTS.INSTRUCTIONS.MD"
+    target.parent.mkdir(parents=True)
+    target.write_text(
+        '---\napplyTo: "legacy/payments/**"\n---\n\n# Legacy\n',
+        encoding="utf-8",
+    )
+    digest = hashlib.sha256(b"services/payments").hexdigest()[:8]
+
+    result = state.module_instruction_targets(tmp_path, ["services/payments"])
+
+    assert result == {
+        "services/payments": (
+            f".github/instructions/services-payments-{digest}.instructions.md"
+        )
+    }
+
+
+def test_module_instruction_targets_reject_case_insensitive_existing_duplicates(
+    tmp_path, monkeypatch
+):
+    instruction_dir = tmp_path / ".github" / "instructions"
+    instruction_dir.mkdir(parents=True)
+    first = instruction_dir / "Payments.instructions.md"
+    second = instruction_dir / "PAYMENTS.INSTRUCTIONS.MD"
+    original_iterdir = Path.iterdir
+
+    def case_colliding_iterdir(path):
+        if path == instruction_dir:
+            return iter((first, second))
+        return original_iterdir(path)
+
+    monkeypatch.setattr(Path, "iterdir", case_colliding_iterdir)
+    monkeypatch.setattr(
+        state,
+        "_read_text_artifact",
+        lambda path, label: '---\napplyTo: "services/payments/**"\n---\n\n# Payments\n',
+    )
+
+    with pytest.raises(state.StateError, match="case-insensitively"):
+        state.module_instruction_targets(tmp_path, ["services/payments"])
 
 
 def test_module_instruction_targets_support_confirmed_parent_child_overlap(tmp_path):
@@ -980,7 +1049,15 @@ def test_module_artifact_requires_all_sections(tmp_path):
         state.write_topic_evidence(tmp_path, "instructions", body)
 
 
-def test_module_artifact_rejects_akmaestro_placeholders(tmp_path):
+@pytest.mark.parametrize(
+    "placeholder",
+    (
+        "<module paths needing scoped instructions>",
+        "<Module name>",
+        "<module-path>",
+    ),
+)
+def test_module_artifact_rejects_akmaestro_placeholders(tmp_path, placeholder):
     _write_instruction_artifacts(tmp_path)
     body = _instructions_evidence(tmp_path)
     body["repositoryContext"]["complexModules"] = [
@@ -993,8 +1070,7 @@ def test_module_artifact_rejects_akmaestro_placeholders(tmp_path):
     _write_module_instruction(tmp_path, target, "services/payments")
     artifact = tmp_path / target
     artifact.write_text(
-        artifact.read_text(encoding="utf-8")
-        + "\n<module paths needing scoped instructions>\n",
+        artifact.read_text(encoding="utf-8") + f"\n{placeholder}\n",
         encoding="utf-8",
     )
     body["generatedFiles"].append(target)
@@ -1175,6 +1251,35 @@ def test_generate_now_completes_after_all_modules_are_generated(tmp_path):
     )
 
     assert completed["topics"]["instructions"]["status"] == "complete"
+
+
+def test_completed_module_finalization_inventory_includes_generated_file(tmp_path):
+    state.setup_init(tmp_path)
+    state.setup_transition(tmp_path, "instructions", "in_progress", expected_revision=0)
+    _write_instruction_artifacts(tmp_path)
+    body = _instructions_evidence(tmp_path)
+    body["moduleKnowledge"] = {"decision": "generate_now"}
+    body["repositoryContext"]["complexModules"] = [
+        {"path": "services/payments", "purpose": "Payment processing"}
+    ]
+    target = state.module_instruction_targets(tmp_path, ["services/payments"])[
+        "services/payments"
+    ]
+    _write_module_instruction(tmp_path, target, "services/payments")
+    body["generatedFiles"].append(target)
+    state.write_topic_evidence(tmp_path, "instructions", body)
+    state.setup_transition(tmp_path, "instructions", "complete", expected_revision=1)
+    for topic in ("tooling", "skills"):
+        _advance_setup(tmp_path, topic)
+    _advance_setup(tmp_path, "hooks", "skipped")
+    current = state._read_json(state._setup_path(tmp_path))
+
+    finalized = state.finalize_setup(
+        tmp_path,
+        expected_revision=current["revision"],
+    )
+
+    assert target in finalized["sharedFiles"]
 
 
 def test_deferred_modules_complete_with_actionable_inventory(tmp_path):

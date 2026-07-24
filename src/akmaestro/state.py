@@ -135,6 +135,8 @@ INSTRUCTION_PLACEHOLDERS = (
     "<how a developer confirms",
     "<ci system and required checks>",
     "<module paths needing scoped instructions",
+    "<module name>",
+    "<module-path>",
     "<base branch and explicit branch",
     "<branch style>",
     "<commit style>",
@@ -398,6 +400,13 @@ def _validate_module_path(value: str, label: str) -> None:
         value == "."
         or normalized.as_posix() != value
         or any(part in {".", ".."} for part in normalized.parts)
+        or any(
+            character in "*?[]{},!'\""
+            or ord(character) < 32
+            or 0x7F <= ord(character) <= 0x9F
+            or character in "\u2028\u2029"
+            for character in value
+        )
     ):
         raise StateError(
             f"{label} must be a normalized complex module path inside the product"
@@ -1514,10 +1523,22 @@ def module_instruction_targets(
 
     desired_scopes = {f"{module_path}/**" for module_path in ordered}
     existing_by_scope: Dict[str, str] = {}
-    occupied: Dict[str, Optional[str]] = {}
+    occupied: Dict[str, Tuple[str, Optional[str]]] = {}
     if instruction_dir.is_dir():
-        for path in sorted(instruction_dir.glob("*.instructions.md")):
+        scoped_paths = sorted(
+            path
+            for path in instruction_dir.iterdir()
+            if path.name.casefold().endswith(".instructions.md")
+        )
+        for path in scoped_paths:
             relative = str(path.relative_to(root)).replace(os.sep, "/")
+            occupied_key = relative.casefold()
+            if occupied_key in occupied:
+                previous = occupied[occupied_key][0]
+                raise StateError(
+                    "scoped instruction filenames collide case-insensitively: "
+                    f"{previous!r} and {relative!r}"
+                )
             resolved = path.resolve()
             if not _is_within(resolved, repository_root):
                 raise StateError(
@@ -1526,7 +1547,7 @@ def module_instruction_targets(
             scope = _frontmatter_apply_to(
                 _read_text_artifact(resolved, f"scoped instruction {relative}")
             )
-            occupied[relative] = scope
+            occupied[occupied_key] = (relative, scope)
             if scope in desired_scopes:
                 if scope in existing_by_scope:
                     raise StateError(
@@ -1540,24 +1561,38 @@ def module_instruction_targets(
             slugs.setdefault(_module_slug(module_path), []).append(module_path)
 
     targets: Dict[str, str] = {}
+    target_keys = set()
     for module_path in ordered:
         scope = f"{module_path}/**"
         if scope in existing_by_scope:
-            targets[module_path] = existing_by_scope[scope]
+            target = existing_by_scope[scope]
+            target_key = target.casefold()
+            if target_key in target_keys:
+                raise StateError(
+                    f"cannot derive a unique module instruction target: {target}"
+                )
+            targets[module_path] = target
+            target_keys.add(target_key)
             continue
         slug = _module_slug(module_path)
         base = f".github/instructions/{slug}.instructions.md"
+        occupied_entry = occupied.get(base.casefold())
         needs_hash = len(slugs[slug]) > 1 or (
-            base in occupied and occupied[base] != scope
+            occupied_entry is not None and occupied_entry[1] != scope
         )
         if needs_hash:
             digest = hashlib.sha256(module_path.encode("utf-8")).hexdigest()[:8]
             base = f".github/instructions/{slug}-{digest}.instructions.md"
-        if base in targets.values() or (base in occupied and occupied[base] != scope):
+        base_key = base.casefold()
+        occupied_entry = occupied.get(base_key)
+        if base_key in target_keys or (
+            occupied_entry is not None and occupied_entry[1] != scope
+        ):
             raise StateError(
                 f"cannot derive a unique module instruction target: {base}"
             )
         targets[module_path] = base
+        target_keys.add(base_key)
     return targets
 
 
@@ -2735,11 +2770,14 @@ def _setup_inventory(root: Path, state: Dict[str, Any]) -> Dict[str, Any]:
     ]
     pending: List[Dict[str, str]] = []
     module_knowledge = None
+    generated_instruction_files: List[str] = []
     instructions_path = root / ".agentic" / "setup" / "instructions-state.json"
     if instructions_path.is_file():
         instructions = _read_json(instructions_path)
         validate_topic_evidence(instructions)
         body = instructions["evidence"]
+        _validate_instruction_artifacts(root, body)
+        generated_instruction_files = list(body["generatedFiles"])
         if state["topics"]["instructions"]["status"] in {"complete", "blocked"}:
             _validate_instruction_completion(body)
         confirmed = sorted(
@@ -2769,6 +2807,7 @@ def _setup_inventory(root: Path, state: Dict[str, Any]) -> Dict[str, Any]:
         ".github/AGENTIC.md",
         ".agentic/setup/initialization-state.json",
     }
+    shared.update(generated_instruction_files)
     manifest_path = root / ".agentic" / "setup" / "kit-manifest.json"
     if manifest_path.is_file():
         try:
