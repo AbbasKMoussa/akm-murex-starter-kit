@@ -1426,10 +1426,10 @@ def _read_text_artifact(path: Path, label: str) -> str:
         raise StateError(f"cannot read UTF-8 {label}: {path}: {exc}") from exc
 
 
-def _has_apply_to_frontmatter(text: str) -> bool:
+def _frontmatter_apply_to(text: str) -> Optional[str]:
     lines = text.splitlines()
     if not lines or lines[0].strip() != "---":
-        return False
+        return None
     try:
         end = next(
             index
@@ -1437,8 +1437,97 @@ def _has_apply_to_frontmatter(text: str) -> bool:
             if line.strip() == "---"
         )
     except StopIteration:
-        return False
-    return any(re.fullmatch(r"applyTo:\s*\S.*", line) for line in lines[1:end])
+        return None
+    matches = [
+        match.group(1) or match.group(2) or match.group(3)
+        for line in lines[1:end]
+        if (
+            match := re.fullmatch(
+                r"""applyTo:\s*(?:"([^"]+)"|'([^']+)'|(\S+))\s*""",
+                line,
+            )
+        )
+    ]
+    return matches[0] if len(matches) == 1 else None
+
+
+def _has_apply_to_frontmatter(text: str) -> bool:
+    return _frontmatter_apply_to(text) is not None
+
+
+def _module_slug(module_path: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", module_path.lower()).strip("-")
+    if slug:
+        return slug
+    digest = hashlib.sha256(module_path.encode("utf-8")).hexdigest()[:8]
+    return f"module-{digest}"
+
+
+def module_instruction_targets(
+    root: Path, module_paths: Sequence[str]
+) -> Dict[str, str]:
+    seen = set()
+    ordered = []
+    for index, module_path in enumerate(module_paths):
+        _validate_module_path(module_path, f"modules[{index}]")
+        if module_path in seen:
+            raise StateError("module target input contains duplicate paths")
+        seen.add(module_path)
+        ordered.append(module_path)
+    ordered.sort()
+
+    repository_root = root.resolve()
+    instruction_dir = root / ".github" / "instructions"
+    if not _is_within(instruction_dir.resolve(), repository_root):
+        raise StateError("instructions directory resolves outside repository")
+
+    desired_scopes = {f"{module_path}/**" for module_path in ordered}
+    existing_by_scope: Dict[str, str] = {}
+    occupied: Dict[str, Optional[str]] = {}
+    if instruction_dir.is_dir():
+        for path in sorted(instruction_dir.glob("*.instructions.md")):
+            relative = str(path.relative_to(root)).replace(os.sep, "/")
+            resolved = path.resolve()
+            if not _is_within(resolved, repository_root):
+                raise StateError(
+                    f"scoped instruction resolves outside repository: {relative}"
+                )
+            scope = _frontmatter_apply_to(
+                _read_text_artifact(resolved, f"scoped instruction {relative}")
+            )
+            occupied[relative] = scope
+            if scope in desired_scopes:
+                if scope in existing_by_scope:
+                    raise StateError(
+                        f"multiple scoped instruction files use applyTo {scope!r}"
+                    )
+                existing_by_scope[scope] = relative
+
+    slugs: Dict[str, List[str]] = {}
+    for module_path in ordered:
+        if f"{module_path}/**" not in existing_by_scope:
+            slugs.setdefault(_module_slug(module_path), []).append(module_path)
+
+    targets: Dict[str, str] = {}
+    for module_path in ordered:
+        scope = f"{module_path}/**"
+        if scope in existing_by_scope:
+            targets[module_path] = existing_by_scope[scope]
+            continue
+        slug = _module_slug(module_path)
+        base = f".github/instructions/{slug}.instructions.md"
+        needs_hash = len(slugs[slug]) > 1 or (
+            base in occupied and occupied[base] != scope
+        )
+        if needs_hash:
+            digest = hashlib.sha256(module_path.encode("utf-8")).hexdigest()[:8]
+            base = f".github/instructions/{slug}-{digest}.instructions.md"
+        if base in targets.values() or (base in occupied and occupied[base] != scope):
+            raise StateError(
+                f"cannot derive a unique module instruction target: {base}"
+            )
+        targets[module_path] = base
+    return targets
 
 
 def _validate_instruction_artifacts(root: Path, evidence: Dict[str, Any]) -> None:
@@ -3162,6 +3251,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--input", required=True, help="JSON object containing one action"
     )
 
+    module_targets = sub.add_parser(
+        "module-targets",
+        help="Derive scoped instruction targets for confirmed modules",
+    )
+    module_targets.add_argument(
+        "--input", required=True, help="JSON object containing a modules array"
+    )
+
     merge_plan = sub.add_parser("merge-plan", help="Plan an exact existing-file update")
     merge_plan.add_argument(
         "--target", required=True, help="Approved repository-relative target"
@@ -3288,6 +3385,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             result = check_instruction_action(root, _load_object_argument(args.input))
             _print_json(result)
             return 0 if result["status"] == "passed" else 4
+        elif args.command == "module-targets":
+            value = _load_object_argument(args.input)
+            _require_keys(value, ("modules",), "module target input")
+            _only_keys(value, ("modules",), "module target input")
+            if not isinstance(value["modules"], list):
+                raise StateError("module target input.modules must be an array")
+            _print_json({"targets": module_instruction_targets(root, value["modules"])})
         elif args.command == "merge-plan":
             _print_json(create_merge_plan(root, args.target, args.input))
         elif args.command == "merge-apply":

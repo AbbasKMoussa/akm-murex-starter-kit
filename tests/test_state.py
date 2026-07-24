@@ -652,6 +652,107 @@ def test_complex_module_paths_must_be_normalized_product_relative_paths(
         state.validate_instructions_evidence(body)
 
 
+def test_module_instruction_targets_are_readable_stable_and_collision_safe(tmp_path):
+    modules = ["services/payments", "services_payments"]
+    first = state.module_instruction_targets(tmp_path, modules)
+    second = state.module_instruction_targets(tmp_path, list(reversed(modules)))
+
+    assert first == second
+    assert set(first) == set(modules)
+    assert len(set(first.values())) == 2
+    for module_path, target in first.items():
+        digest = hashlib.sha256(module_path.encode("utf-8")).hexdigest()[:8]
+        assert target == (
+            f".github/instructions/services-payments-{digest}.instructions.md"
+        )
+
+
+def test_module_instruction_targets_reuse_existing_exact_scope(tmp_path):
+    target = tmp_path / ".github" / "instructions" / "payments.instructions.md"
+    target.parent.mkdir(parents=True)
+    target.write_text(
+        '---\napplyTo: "services/payments/**"\n---\n\n# Payments\n',
+        encoding="utf-8",
+    )
+
+    result = state.module_instruction_targets(tmp_path, ["services/payments"])
+
+    assert result == {
+        "services/payments": ".github/instructions/payments.instructions.md"
+    }
+
+
+def test_module_instruction_targets_hash_an_occupied_mismatched_target(tmp_path):
+    target = tmp_path / ".github" / "instructions" / "services-payments.instructions.md"
+    target.parent.mkdir(parents=True)
+    target.write_text(
+        '---\napplyTo: "legacy/payments/**"\n---\n\n# Legacy\n',
+        encoding="utf-8",
+    )
+    digest = hashlib.sha256(b"services/payments").hexdigest()[:8]
+
+    result = state.module_instruction_targets(tmp_path, ["services/payments"])
+
+    assert result["services/payments"].endswith(
+        f"services-payments-{digest}.instructions.md"
+    )
+
+
+def test_module_instruction_targets_support_confirmed_parent_child_overlap(tmp_path):
+    result = state.module_instruction_targets(
+        tmp_path, ["services", "services/payments"]
+    )
+
+    assert result == {
+        "services": ".github/instructions/services.instructions.md",
+        "services/payments": (".github/instructions/services-payments.instructions.md"),
+    }
+
+
+def test_module_instruction_targets_reject_instruction_directory_escape(tmp_path):
+    outside = tmp_path.parent / f"{tmp_path.name}-outside"
+    outside.mkdir()
+    instruction_dir = tmp_path / ".github" / "instructions"
+    instruction_dir.parent.mkdir(parents=True)
+    try:
+        instruction_dir.symlink_to(outside, target_is_directory=True)
+    except OSError:
+        pytest.skip("directory symlinks are unavailable")
+
+    with pytest.raises(
+        state.StateError, match="instructions directory resolves outside"
+    ):
+        state.module_instruction_targets(tmp_path, ["services/payments"])
+
+
+def test_module_targets_cli_prints_derived_targets(tmp_path, capsys):
+    module_path = tmp_path / "module-paths.json"
+    module_path.write_text(
+        json.dumps({"modules": ["services/payments"]}),
+        encoding="utf-8",
+    )
+
+    assert (
+        state.main(
+            [
+                "--root",
+                str(tmp_path),
+                "module-targets",
+                "--input",
+                str(module_path),
+            ]
+        )
+        == 0
+    )
+    assert json.loads(capsys.readouterr().out) == {
+        "targets": {
+            "services/payments": (
+                ".github/instructions/services-payments.instructions.md"
+            )
+        }
+    }
+
+
 def test_instruction_action_check_uses_argument_arrays_without_a_shell(tmp_path):
     action = {
         "command": [
