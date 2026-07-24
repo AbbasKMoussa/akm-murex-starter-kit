@@ -1079,6 +1079,81 @@ def test_generate_now_cannot_complete_with_pending_modules(tmp_path):
     assert current["topics"]["instructions"]["status"] == "in_progress"
 
 
+def test_generate_now_cannot_block_with_pending_modules(tmp_path):
+    state.setup_init(tmp_path)
+    state.setup_transition(tmp_path, "instructions", "in_progress", expected_revision=0)
+    _write_instruction_artifacts(tmp_path)
+    body = _instructions_evidence(tmp_path, blocked_command="build")
+    body["moduleKnowledge"] = {"decision": "generate_now"}
+    body["repositoryContext"]["complexModules"] = [
+        {"path": "services/payments", "purpose": "Payment processing"}
+    ]
+    body["pendingModules"] = ["services/payments"]
+    first = state.write_topic_evidence(tmp_path, "instructions", body)
+    blocker = "Build unavailable under organization policy"
+
+    with pytest.raises(state.StateError, match="accepted module generation"):
+        state.setup_transition(
+            tmp_path,
+            "instructions",
+            "blocked",
+            reason=blocker,
+            expected_revision=1,
+        )
+
+    target = state.module_instruction_targets(tmp_path, ["services/payments"])[
+        "services/payments"
+    ]
+    _write_module_instruction(tmp_path, target, "services/payments")
+    generated = copy.deepcopy(body)
+    generated["generatedFiles"].append(target)
+    generated["pendingModules"] = []
+    second = state.write_topic_evidence(
+        tmp_path,
+        "instructions",
+        generated,
+        expected_revision=first["revision"],
+    )
+    blocked = state.setup_transition(
+        tmp_path,
+        "instructions",
+        "blocked",
+        reason=blocker,
+        expected_revision=1,
+    )
+    assert blocked["topics"]["instructions"]["status"] == "blocked"
+
+    for topic in ("tooling", "skills"):
+        _advance_setup(tmp_path, topic)
+    _advance_setup(tmp_path, "hooks", "skipped")
+
+    pending_again = copy.deepcopy(generated)
+    pending_again["generatedFiles"].remove(target)
+    pending_again["pendingModules"] = ["services/payments"]
+    state.write_topic_evidence(
+        tmp_path,
+        "instructions",
+        pending_again,
+        expected_revision=second["revision"],
+    )
+
+    with pytest.raises(state.StateError, match="accepted module generation"):
+        state.setup_transition(
+            tmp_path,
+            "instructions",
+            "blocked",
+            reason=blocker,
+            expected_revision=blocked["revision"],
+        )
+    with pytest.raises(state.StateError, match="accepted module generation"):
+        state.setup_status(tmp_path)
+    current = state._read_json(state._setup_path(tmp_path))
+    with pytest.raises(state.StateError, match="accepted module generation"):
+        state.validate_setup_integrity(tmp_path, current)
+    with pytest.raises(state.StateError, match="accepted module generation"):
+        state.finalize_setup(tmp_path, expected_revision=current["revision"])
+
+
 def test_generate_now_completes_after_all_modules_are_generated(tmp_path):
     state.setup_init(tmp_path)
     state.setup_transition(tmp_path, "instructions", "in_progress", expected_revision=0)

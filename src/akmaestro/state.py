@@ -609,7 +609,10 @@ def validate_setup_integrity(root: Path, state: Dict[str, Any]) -> None:
         if evidence["topic"] != topic:
             raise StateError(f"setup evidence topic mismatch for {topic}")
         _validate_topic_artifacts(root, evidence)
-        if topic == "instructions" and state["topics"][topic]["status"] == "complete":
+        if topic == "instructions" and state["topics"][topic]["status"] in {
+            "complete",
+            "blocked",
+        }:
             _validate_instruction_completion(evidence["evidence"])
     if state["topics"]["tooling"]["status"] in {"complete", "blocked"}:
         validate_requirements(_read_json(_requirements_path(root)))
@@ -675,7 +678,7 @@ def setup_transition(
             if evidence["topic"] != topic:
                 raise StateError(f"setup evidence topic mismatch for {topic}")
             _validate_topic_artifacts(root, evidence)
-            if topic == "instructions" and status == "complete":
+            if topic == "instructions" and status in {"complete", "blocked"}:
                 _validate_instruction_completion(evidence["evidence"])
             has_blockers = _topic_has_blockers(topic, evidence["evidence"])
             if status == "complete" and has_blockers:
@@ -2737,7 +2740,7 @@ def _setup_inventory(root: Path, state: Dict[str, Any]) -> Dict[str, Any]:
         instructions = _read_json(instructions_path)
         validate_topic_evidence(instructions)
         body = instructions["evidence"]
-        if state["topics"]["instructions"]["status"] == "complete":
+        if state["topics"]["instructions"]["status"] in {"complete", "blocked"}:
             _validate_instruction_completion(body)
         confirmed = sorted(
             module["path"] for module in body["repositoryContext"]["complexModules"]
