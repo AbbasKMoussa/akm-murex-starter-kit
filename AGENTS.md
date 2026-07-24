@@ -78,7 +78,12 @@ deterministic state controller (`state.py`) and installable assets under
 state schemas/protocol, hooks, and bootstrap templates. The installer/controller
 enforce v3 state contracts, strict topic evidence, ledger-backed safe
 argument-array action checks, deterministic merge/finalization, and
-placeholder-free root instruction artifacts. They
+placeholder-free root instruction artifacts. Instructions evidence records the
+lead's `generate_now`, `defer`, or `not_applicable` module-knowledge decision;
+accepted generation is controller-gated until every confirmed module has a
+validated deterministic scoped artifact, with per-module evidence revisions
+resumable through `/akmaestro-init`. Deferred modules remain non-blocking exact
+follow-ups. They
 are tested (`tests/test_installer.py`, `tests/test_state.py`, run by CI on Linux + Windows via
 `.github/workflows/ci.yml`; `uv run pytest` locally) and the wheel bundles the
 assets (CI verifies all 19 skills + hooks land in it). Note:

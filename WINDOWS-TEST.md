@@ -171,6 +171,8 @@ Skip if GitHub Copilot (VS Code or CLI) isn't installed here; note it as skipped
 4. During `/akmaestro-init`, confirm instructions setup presents one sourced
    product/command/Git summary, uses argument-array `action-check` for finite
    commands, writes strict instructions evidence, and leaves no placeholders.
+   Confirm accepted `generate_now` work remains `in_progress` and setup cannot
+   finalize while a module remains pending.
 5. Confirm hooks remain disabled until the lead consents during `/setup-hooks`.
    After enablement, try an edit to `.env` and to a normal
    file, and note whether the **restricted-path guard** actually fires (deny vs
@@ -180,6 +182,39 @@ Skip if GitHub Copilot (VS Code or CLI) isn't installed here; note it as skipped
    `/akmaestro-init`, and
    that any missing local requirement is offered as a confirmed structured
    remediation action.
+
+### C1 — Module path contract
+
+During instructions setup in `akm-scratch`, confirm `services/payments` as a
+complex module and choose `defer` so the topic can complete. After instructions
+evidence is written:
+
+```powershell
+$state = Get-Content .agentic\setup\instructions-state.json -Raw | ConvertFrom-Json
+$state.evidence.repositoryContext.complexModules[0].path
+$state.evidence.pendingModules[0]
+```
+
+**Expected:** both values are exactly `services/payments`, and
+`moduleKnowledge.decision` is `defer`.
+
+Create an invalid evidence revision with a backslash-form module path:
+
+```powershell
+$bad = $state.evidence
+$bad.repositoryContext.complexModules[0].path = 'services\payments'
+$bad.pendingModules[0] = 'services\payments'
+$badJson = $bad | ConvertTo-Json -Depth 100
+$utf8NoBom = New-Object System.Text.UTF8Encoding -ArgumentList $false
+[System.IO.File]::WriteAllText((Join-Path $PWD 'module-path-invalid.json'), $badJson, $utf8NoBom)
+uv run --no-project python .agentic\bin\akmaestro-state.py evidence-write instructions --input module-path-invalid.json --expected-revision $state.revision
+```
+
+**Expected:** the command exits nonzero with a `complex module path` validation
+error. It must reject `services\payments`, not silently normalize it, and
+`.agentic\setup\instructions-state.json` must retain its original revision and
+POSIX `services/payments` values. Remove `module-path-invalid.json` after
+recording the result.
 
 Report: which skills were discoverable, what `/doctor` said, and whether hooks
 fired live (and on which surface: VS Code or CLI).

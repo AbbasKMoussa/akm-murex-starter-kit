@@ -8,6 +8,10 @@
 
 **Tech Stack:** Python 3.9+ standard library controller, JSON Schema Draft 2020-12, pytest, jsonschema test dependency, Markdown agent skills, uv, Ruff, Hatchling.
 
+**Execution correction:** Release audit expanded Task 4's `generate_now` gate
+from a `complete`-only check to both terminal states (`complete` and `blocked`),
+implemented in `d266fb5`.
+
 ## Global Constraints
 
 - The bundled `.agentic/bin/akmaestro-state.py` controller must remain Python 3.9 compatible and standard-library only.

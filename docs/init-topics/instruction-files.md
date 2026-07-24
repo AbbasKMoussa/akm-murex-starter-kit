@@ -37,7 +37,8 @@ instructions because duplicated instruction sources can conflict.
 
 `.github/instructions/tests.instructions.md` contains test-specific guidance using path-scoped instructions.
 
-Path-scoped module files are generated later for complex modules and describe
+Path-scoped module files are generated during initialization when the lead
+accepts generation, or later through an exact deferred follow-up. They describe
 only what differs from root guidance. A nested module `AGENTS.md` is generated
 only when the lead explicitly requests cross-agent portability.
 
@@ -81,6 +82,25 @@ Only follow up where the proposed answer is incomplete or ambiguous. Never
 invent a command or Git policy. Commands must be explicitly `configured` or
 `not_applicable`; policies must be `defined`, `none`, or `unspecified`. Every
 negative disposition requires a reason.
+
+Complex-module candidates in that summary include a normalized
+product-relative POSIX path, proposed purpose, strongest source, confidence,
+and any existing `applyTo` scope. The lead may add, remove, or correct
+candidates; a removed candidate must be confirmed as a false positive or
+intentionally outside the product's module-knowledge scope. Explicitly confirm
+parent/child overlaps because both scoped files may apply.
+
+For a non-empty confirmed list, ask once:
+
+```text
+Generate scoped knowledge for all selected modules now?
+```
+
+Accepting records `moduleKnowledge.decision` as `generate_now`; all selected
+modules must validate while instructions remains `in_progress`, before setup
+can finalize. Declining records `defer`, leaves unresolved modules pending, and
+permits completion with exact follow-up commands. An empty confirmed list
+records `not_applicable` and keeps both module lists empty.
 
 Before a bootstrap or other machine-changing action, show the structured action
 and obtain confirmation. Check finite actions through controller `action-check`,
@@ -176,8 +196,9 @@ The following modules need scoped setup:
 
 - `<path>`: <short purpose/status>
 
-Each complex module should get a scoped `.instructions.md` file through
-`/setup-instructions module <path>`.
+Each confirmed complex module gets a scoped `.instructions.md` file during
+accepted initialization. A deferred module retains an exact
+`/setup-instructions module <path>` follow-up.
 
 ## Git Workflow
 
@@ -247,7 +268,10 @@ applyTo: "**/*test*,**/*spec*,**/tests/**,**/test/**"
 - all six Git policies are defined, absent, or unspecified explicitly;
 - `.agentic/setup/instructions-state.json` records controller-written evidence
   for product, commands/results, verification, Git workflow, repository context,
-  generated files, and pending modules;
+  `moduleKnowledge`, generated files, and pending modules;
+- `generate_now` has no pending modules before either terminal topic state or
+  setup finalization; `defer` may retain pending modules as non-blocking
+  follow-ups; `not_applicable` has no confirmed or pending modules;
 - after evidence is written, the controller makes the authoritative topic
   transition to `complete` or documented `blocked`;
 - existing instruction files were merged per the section-aware policy, not overwritten.
@@ -267,10 +291,13 @@ Creates or updates:
 .github/instructions/<module-id>.instructions.md
 ```
 
-The file requires YAML frontmatter with an `applyTo` glob scoped to the module.
-Its body covers purpose, boundaries, differing commands, important paths,
-patterns, pitfalls, and restrictions. Detect these first and present one compact
-draft; ask only about missing or conflicting facts.
+Pass the full confirmed module list to the controller's `module-targets`
+command and use its returned mapping as the only filename authority. Module
+paths and artifact paths are product-relative POSIX paths. The file requires
+YAML frontmatter with the exact `applyTo: "<module-path>/**"` glob. Its body has
+Purpose, Boundaries, Commands, Important Paths, Patterns, Pitfalls, and
+Restrictions sections. Detect these first and present one compact sourced
+draft; ask only about missing, conflicting, or low-confidence facts.
 
 If the lead explicitly requests a cross-agent instruction file, create
 `<module>/AGENTS.md` instead of or alongside the scoped GitHub instruction file.
@@ -281,10 +308,14 @@ Existing files still use the reviewed merge protocol.
 A module is complete when:
 
 - the confirmed scoped instruction artifact exists with valid `applyTo`;
-- the file documents purpose, boundaries, commands, patterns, risks, and restrictions;
-- a new instructions evidence revision removes the module from `pendingModules`.
+- the file documents all seven required sections without placeholders;
+- a successful atomic instructions-evidence revision adds the controller target
+  to `generatedFiles` and removes the module from `pendingModules`.
 
-There is no second module-status file.
+Process pending modules in normalized path order and revise evidence after each
+successful validation. There is no second module-status file. A declined merge
+or validation failure leaves the current module pending. If interrupted,
+resume the first controller-returned pending module through `/akmaestro-init`.
 
 ## Status And Help Behavior
 
@@ -295,19 +326,27 @@ Instruction files:
 - Root AGENTS.md: complete
 - Copilot instructions: complete
 - Test instructions: complete
+- Module knowledge: generate_now
 - Complex modules:
   - frontend: complete
   - backend/payment: pending
   - backend/auth: pending
 
 Recommended next step:
-- run /setup-instructions module backend/payment
+- run /akmaestro-init
 ```
 
 If root instructions are missing, the recommended next step is
 `/setup-instructions`.
 
-If root instructions are complete but at least one complex module is pending,
-recommend the next `/setup-instructions module <path>` command.
+If `generate_now` has at least one pending module, instructions remain
+`in_progress` and the sole cross-session next command is `/akmaestro-init`.
 
-If all instruction files are complete, mark the instruction-files topic as complete and recommend the next initialization topic.
+If `defer` has pending modules, instructions may be complete. Report every
+controller-returned `/setup-instructions module <path>` command as a
+non-blocking follow-up. A later deferred module update revises evidence without
+reopening the completed topic.
+
+If accepted module work is exhausted, deferred work is recorded, or module
+knowledge is not applicable, mark the instruction-files topic as complete and
+recommend the next initialization topic.

@@ -80,7 +80,8 @@ Open the selected product itself as the VS Code workspace, or start Copilot CLI
 from that directory. Nested `.github` files are product-local Copilot
 customizations, not repository-wide GitHub configuration. Do not use this mode
 for an ordinary module that shares its product lifecycle with the repository;
-use `/setup-instructions module <path>` after normal initialization instead.
+initialize at the normal repository root and let `/akmaestro-init` confirm and
+scope that module instead.
 
 The installer lays down all 19 skills, the optional hook files in a disabled
 state, minimal instruction
@@ -127,12 +128,25 @@ topics — **instructions, tooling, skills, hooks** —
 detecting product, command, and Git facts with provenance, presenting one short
 confirmation summary, generating repo-specific files, and verifying finite
 commands without a shell. It can span multiple sessions and resumes from where
-you left off. On
-completion it writes **`.github/AGENTIC.md`**, a committed guide so every teammate
-knows what's installed and how to use it. Review and commit the resulting shared
-AKMaestro files. `/akmaestro-init` is repository initialization, not a
-per-developer step. Hook files remain disabled until the lead reviews their
-behavior and explicitly consents during the optional hooks topic.
+you left off.
+
+The sourced summary includes proposed complex modules and their provenance. The
+lead corrects and confirms that list; when it is non-empty, setup asks once
+whether to generate scoped knowledge for every selected module now. Accepting
+records `generate_now` and keeps the instructions topic `in_progress`, with
+finalization unavailable, until every selected module validates. Declining
+records `defer`, allows setup to finish, and preserves an exact
+`/setup-instructions module <path>` follow-up for each pending module. No
+confirmed modules records `not_applicable`. Module files default to
+`.github/instructions/`; nested module `AGENTS.md` files are opt-in. An
+interrupted accepted run resumes through `/akmaestro-init`.
+
+On completion it writes **`.github/AGENTIC.md`**, a committed guide so every
+teammate knows what's installed and how to use it. Review and commit the
+resulting shared AKMaestro files. `/akmaestro-init` is repository
+initialization, not a per-developer step. Hook files remain disabled until the
+lead reviews their behavior and explicitly consents during the optional hooks
+topic.
 
 Everyday helper skills included by the bootstrap (usable any time, not just in a
 flow):

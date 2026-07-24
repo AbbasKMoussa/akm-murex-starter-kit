@@ -76,6 +76,35 @@ Expected: setup is controller-driven, resumable, non-destructive, and ends with
 a review-and-commit handoff. A genuine policy/environment block may be recorded;
 an ordinary failed command must remain unfinished.
 
+### Module-knowledge decision paths
+
+Run M1-M4 in separate scratch repositories or disposable branches so each
+begins before instructions evidence exists:
+
+- **M1 — accept two modules:** Confirm two complex modules, including their
+  purpose, source, confidence, and product-relative POSIX paths. Accept the
+  single generate-now question. Verify both controller-derived files stay under
+  `.github/instructions/`, use exact `<module-path>/**` scopes, contain all seven
+  required sections, and are added to evidence only after validation.
+  Instructions must remain `in_progress`, and setup must not finalize, until
+  both are complete.
+- **M2 — defer:** Confirm one or more modules and decline generation. Verify
+  `moduleKnowledge.decision` is `defer`, setup finalizes, and status plus the
+  final handoff print the controller-returned
+  `/setup-instructions module <path>` command for every pending module.
+- **M3 — interrupt and resume:** Confirm two modules and accept generation.
+  Stop after the first module artifact and atomic evidence revision. Open a new
+  Copilot session, run `/akmaestro-init`, and verify it preserves the first
+  completion and resumes at the second module without asking for the topic
+  skill as the cross-session command.
+- **M4 — correct a false positive:** Remove or correct one detected candidate
+  before confirming the sourced summary. Verify the false-positive path is
+  absent from committed `repositoryContext.complexModules`, `pendingModules`,
+  generated targets, and all status/finalization output.
+
+For every path, confirm the default artifact is a scoped instruction file and
+that a nested module `AGENTS.md` appears only after a separate explicit request.
+
 ## Phase 3: Hook scripts while disabled
 
 Skip hook checks when assets were omitted. Directly invoke the platform scripts
@@ -142,6 +171,18 @@ When modifiable and read-only siblings are declared:
 33. Confirm a feature story may read both siblings, may edit and run commands in
     the modifiable sibling, and never edits the read-only sibling.
 34. Confirm all sibling graphs remain under the main repository's local cache.
+
+## Phase 7: Explicit subproject module boundary
+
+Install into an independent product with `--subproject`, open that product as
+the workspace/root, and repeat M1 with two modules inside it.
+
+35. Confirm every detected module candidate is below the selected product root;
+    the enclosing Git root and sibling products are not candidates.
+36. Confirm every `module-targets` result, generated scoped file, evidence
+    revision, and setup-state write stays below the selected product root.
+37. Confirm neither `.github/` nor `.agentic/` module artifacts are created at
+    the enclosing Git root or in sibling products.
 
 ## Report
 

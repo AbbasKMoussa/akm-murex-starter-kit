@@ -76,10 +76,36 @@ and that no inspection, state, or edits leak into sibling products.
    command remains `/akmaestro-init` while the controller reports the internal
    next topic separately.
 3. Confirm instructions setup proposes one sourced product/command/Git summary,
-   checks finite commands through `action-check`, and writes strict evidence
-   without placeholders.
+   including complex-module candidates with provenance. Confirm the lead can
+   correct the module list, finite commands run through `action-check`, and
+   strict evidence has `moduleKnowledge` with no placeholders.
 4. After setup, run `/doctor` to check the setup is healthy.
 5. Confirm `.agentic/local/` is ignored, review the shared diff, and commit it.
+
+### Module-knowledge decision paths
+
+Use isolated scratch repositories or fresh disposable branches so each path
+starts before instructions evidence is committed:
+
+1. Confirm two modules, accept generation, and verify both controller-derived
+   files under `.github/instructions/` have exact product-relative `applyTo`
+   scopes and all seven required sections. Instructions must remain
+   `in_progress`, and setup must not finalize, until both artifacts validate.
+2. Confirm at least one module, decline generation, and verify initialization
+   finalizes with `moduleKnowledge.decision: "defer"` plus the exact
+   `/setup-instructions module <path>` follow-up for every pending module.
+3. Confirm two modules and accept generation, then interrupt after the first
+   artifact and evidence revision. In a fresh session run `/akmaestro-init`;
+   verify the first module stays complete and generation resumes at the second.
+4. Remove or correct a false-positive candidate before accepting the summary.
+   Verify it is absent from committed `repositoryContext.complexModules`,
+   `pendingModules`, generated targets, and status output.
+
+For an explicit subproject installation, repeat a two-module path and confirm
+every detected candidate is below the selected product root. All
+`module-targets` results, scoped instruction files, evidence, and setup state
+must remain below that root; the enclosing Git root and sibling products must
+receive none of them.
 
 ## 3. Run Stage 2 (feature flow)
 
@@ -98,6 +124,10 @@ you to open a new session and run the next command — that's expected. Try both
 - Does instructions setup detect and confirm product purpose, all canonical
   commands, verification, and explicit Git policies without inventing values?
 - Does invalid/unsafe instructions evidence fail before the topic transition?
+- Does accepted module generation remain mandatory-to-finish, while deferred
+  modules finalize with exact follow-up commands?
+- Does interrupted module generation resume through `/akmaestro-init` without
+  repeating a validated module?
 - Does `/akmaestro-init` drive the flow end to end? Does it follow the installed `/setup-*`
   steps automatically, or do you invoke each (`/setup-instructions`,
   `/setup-tooling`, `/setup-skills`, `/setup-hooks`) yourself?

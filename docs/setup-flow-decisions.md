@@ -99,7 +99,9 @@ The flow may span multiple sessions, so setup state must be persisted on disk.
    - complex module setup through `/setup-instructions module <path>` or
      `/setup-instructions module all`.
 
-   See `docs/init-topics/instruction-files.md`.
+   Decision 31 later integrates module generation into `/akmaestro-init` while
+   retaining those commands for deferred follow-up. See
+   `docs/init-topics/instruction-files.md`.
 
 9. The second agreed initialization topic is tooling.
 
@@ -177,11 +179,14 @@ The flow may span multiple sessions, so setup state must be persisted on disk.
     the tooling floor. `blocked` needs a real environment reason — not a skipped
     or failed step.
 
-19. The instructions gate is satisfied by root files only (decided).
+19. The instructions gate is satisfied by root files only (superseded by
+    decision 31).
 
-    Root `AGENTS.md` + `copilot-instructions.md` + `tests.instructions.md` satisfy
-    the mandatory gate. Pending modules are warnings, not blockers. The default
-    module artifact is a path-scoped
+    Under this superseded model, root `AGENTS.md` +
+    `copilot-instructions.md` + `tests.instructions.md` satisfied the mandatory
+    gate and every pending module was only a warning. Decision 31 now makes
+    `generate_now` pending modules mandatory and keeps warning-only behavior for
+    `defer`. The default module artifact remains a path-scoped
     `.github/instructions/<module-id>.instructions.md`; nested `AGENTS.md` is
     generated only when explicitly requested for cross-agent use.
 
@@ -293,10 +298,36 @@ The flow may span multiple sessions, so setup state must be persisted on disk.
 
     This is for the exceptional case where one Git repository contains products
     with independent lifecycles but no nested `.git` directories. Ordinary
-    complex modules continue to use root initialization plus
+    complex modules continue to use root initialization, where they are
+    confirmed and offered for generation. Deferred modules retain
     `/setup-instructions module <path>`. Developers must open the product as the
     VS Code workspace or start Copilot CLI there so its nested `.github`
     customizations are the active workspace customizations.
+
+31. Complex-module knowledge is a reviewed, controller-enforced initialization
+    decision (revises decision 19).
+
+    Detection presents complex-module candidates with product-relative POSIX
+    paths, purpose, provenance, confidence, and existing scope. The team lead
+    corrects and confirms the list. A non-empty list produces one
+    "Generate scoped knowledge for all selected modules now?" question:
+    `generate_now` makes every selected module mandatory-to-finish,
+    `defer` permits completion with exact follow-up commands, and an empty list
+    records `not_applicable`.
+
+    The controller validates the decision, derives deterministic
+    `.github/instructions/<module-id>.instructions.md` targets, enforces exact
+    `applyTo` scopes and required sections, and refuses both instructions
+    terminal states and setup finalization while accepted modules remain
+    pending. Evidence advances after each validated module, so interruption
+    resumes through `/akmaestro-init`. Nested module `AGENTS.md` files remain
+    opt-in.
+
+    Unconditional generation was rejected because detection can produce false
+    positives and existing scoped files require reviewed merges.
+    Post-finalization generation was rejected as the only path because
+    accepting the work during initialization would otherwise provide no
+    enforceable completion or resumability guarantee.
 
 The integrated Stage 1 spec (orchestrator, bootstrap, detection, state schema,
 merge policy, universal status, and flow help) lives in `docs/setup-flow.md`. The four topic

@@ -119,6 +119,32 @@ The agent presents one sourced matrix and asks only about missing, conflicting,
 or low-confidence rows. History can suggest a pattern but does not establish
 team policy without lead confirmation.
 
+### Complex-module knowledge
+
+Complex-module candidates include their normalized product-relative path,
+purpose, strongest source, confidence, and any existing scoped instruction.
+The lead corrects and confirms the candidate list, including any intentional
+parent/child overlap. A non-empty confirmed list produces one question:
+
+```text
+Generate scoped knowledge for all selected modules now?
+```
+
+An accepted answer records `generate_now`. Every selected module starts
+pending, and the controller keeps the instructions topic `in_progress` and
+prevents setup finalization until each module artifact validates. A declined
+answer records `defer`; setup may complete, but status and finalization retain an exact
+`/setup-instructions module <path>` command for every pending module. An empty
+confirmed list records `not_applicable` without asking the question.
+
+The default artifact is
+`.github/instructions/<module-id>.instructions.md`, with a product-relative
+POSIX `applyTo: "<module-path>/**"` scope. The controller's `module-targets`
+command is the filename authority. Nested `<module>/AGENTS.md` files are
+generated only after a separate explicit request. Evidence is revised after
+each validated module, so an interrupted `generate_now` run resumes at the
+first pending module through `/akmaestro-init`.
+
 ## Existing-file changes
 
 New files may be created directly. Existing instruction and hook files use the
@@ -141,7 +167,8 @@ Every topic writes its evidence before its terminal aggregate transition.
 Topic contracts are exact and reject unknown or missing fields:
 
 - instructions: product, all seven command definitions/results, verification,
-  six Git policies, repository context, generated files, and pending modules;
+  six Git policies, repository context, the module-knowledge decision,
+  generated files, and pending modules;
 - tooling: selected languages, Graphifyy version/query/graph paths, one LSP per
   language, requirements revision, restart requirement, and blockers;
 - skills: kit version, complete expected and verified catalog, collisions,
@@ -154,6 +181,31 @@ timeout. After user confirmation, `action-check` executes without a shell and
 records the result in `.agentic/setup/action-checks.json`. Instructions evidence
 must reference the exact controller-issued `checkId` and action hash. A fabricated,
 omitted, substituted, or empty blocked check is rejected.
+
+An instructions-evidence excerpt for accepted module generation is:
+
+```json
+{
+  "repositoryContext": {
+    "complexModules": [
+      {"path": "services/payments", "purpose": "Payment processing"}
+    ]
+  },
+  "moduleKnowledge": {"decision": "generate_now"},
+  "generatedFiles": [
+    "AGENTS.md",
+    ".github/copilot-instructions.md",
+    ".github/instructions/tests.instructions.md"
+  ],
+  "pendingModules": ["services/payments"]
+}
+```
+
+`pendingModules` must be a subset of the confirmed list. `generate_now` may be
+persisted while work is in progress but cannot transition instructions to
+either terminal state or finalize setup until the list is empty. `defer`
+permits completion with pending modules as explicit warnings; `not_applicable`
+requires both module lists to be empty.
 
 ## State contract
 

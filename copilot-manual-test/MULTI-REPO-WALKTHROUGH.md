@@ -185,9 +185,12 @@ Every graph path must be under app-a's
 generated graph output.
 Inspect `.agentic/setup/instructions-state.json` too: it should contain strict
 product, all seven command definitions/results, verification, Git-policy,
-repository-context, and generated-file evidence. Confirm finite commands were
-checked through controller `action-check` and no placeholder remains in
-`AGENTS.md`.
+repository-context, required `moduleKnowledge` decision, generated-file, and
+pending-module evidence. Confirm `generate_now` has no pending modules before
+instructions becomes terminal or setup finalizes, while `defer` retains exact
+module follow-up commands.
+Confirm finite commands were checked through controller `action-check` and no
+placeholder remains in `AGENTS.md`.
 Review the shared diff and commit it. Do not add anything under `.agentic/local/`.
 
 > ✅ **Check 1 (the crux of the model):** `../lib-b` is in `editable-paths.txt`;

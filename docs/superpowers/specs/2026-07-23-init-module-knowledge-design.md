@@ -104,9 +104,9 @@ The controller enforces these invariants:
    frontmatter.
 3. `not_applicable` requires both `complexModules` and `pendingModules` to be
    empty.
-4. `generate_now` may be written while modules remain pending, but an
-   instructions transition to `complete` is rejected until `pendingModules` is
-   empty.
+4. `generate_now` may be written while modules remain pending, but instructions
+   must remain `in_progress`: both terminal transitions and setup finalization
+   are rejected until `pendingModules` is empty.
 5. `defer` permits an instructions transition to `complete` with pending modules;
    those modules remain warnings in status and finalization output.
 
@@ -143,7 +143,7 @@ first pending module; topic skills are not used as cross-session resume commands
 
 ## Module Artifact Contract
 
-The default scoped artifact uses repository-relative POSIX paths:
+The default scoped artifact uses AKMaestro-root-relative POSIX paths:
 
 ```md
 ---
@@ -224,7 +224,8 @@ Automated tests will cover:
 - all three decision values and rejection of unknown or missing values;
 - `not_applicable` list invariants;
 - pending-module subset validation;
-- rejection of `complete` for `generate_now` with pending modules;
+- rejection of `complete`, `blocked`, and finalization for `generate_now` with
+  pending modules;
 - successful completion when accepted module generation is exhausted;
 - permitted completion and warnings for `defer`;
 - atomic evidence revision after each completed module;

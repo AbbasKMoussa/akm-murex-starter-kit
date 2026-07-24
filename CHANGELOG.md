@@ -8,6 +8,9 @@ contract without migration support for earlier development formats.
 
 ### Added
 
+- Reviewed complex-module knowledge generation during `/akmaestro-init`, with
+  controller-enforced completion, deterministic scoped targets, and resumable
+  per-module evidence.
 - Explicit `init --subproject` and `update --subproject` support for an
   independently operated product below a shared Git root.
 - Portable installation-boundary metadata and workflow guidance that confines
