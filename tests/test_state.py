@@ -195,6 +195,19 @@ def _write_instruction_artifacts(root):
     )
 
 
+def _write_module_instruction(root, relative, module_path):
+    headings = "\n\n".join(
+        f"## {heading}\n\nConfirmed module-specific guidance."
+        for heading in state.MODULE_INSTRUCTION_HEADINGS
+    )
+    target = root / relative
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        f'---\napplyTo: "{module_path}/**"\n---\n\n# Module Knowledge\n\n{headings}\n',
+        encoding="utf-8",
+    )
+
+
 def _advance_setup(root: Path, topic: str, terminal: str = "complete"):
     current = state._read_json(state._setup_path(root))
     state.setup_transition(
@@ -877,28 +890,171 @@ def test_instruction_artifacts_must_exist_and_contain_no_placeholders(tmp_path):
         )
 
 
-def test_module_instruction_claims_require_existing_scoped_apply_to(tmp_path):
+def test_valid_module_artifact_is_accepted(tmp_path):
     _write_instruction_artifacts(tmp_path)
-    module = tmp_path / ".github" / "instructions" / "payments.instructions.md"
+    (tmp_path / "services" / "payments").mkdir(parents=True)
     body = _instructions_evidence(tmp_path)
     body["repositoryContext"]["complexModules"] = [
-        {"path": "src/payments", "purpose": "Payment processing"}
+        {"path": "services/payments", "purpose": "Payment processing"}
     ]
     body["moduleKnowledge"] = {"decision": "generate_now"}
-    body["generatedFiles"].append(".github/instructions/payments.instructions.md")
+    target = state.module_instruction_targets(tmp_path, ["services/payments"])[
+        "services/payments"
+    ]
+    _write_module_instruction(tmp_path, target, "services/payments")
+    body["generatedFiles"].append(target)
+    body["pendingModules"] = []
+
+    written = state.write_topic_evidence(tmp_path, "instructions", body)
+
+    assert written["evidence"]["pendingModules"] == []
+
+
+def test_module_artifact_claim_requires_existing_scoped_file(tmp_path):
+    _write_instruction_artifacts(tmp_path)
+    body = _instructions_evidence(tmp_path)
+    body["repositoryContext"]["complexModules"] = [
+        {"path": "services/payments", "purpose": "Payment processing"}
+    ]
+    body["moduleKnowledge"] = {"decision": "generate_now"}
+    target = state.module_instruction_targets(tmp_path, ["services/payments"])[
+        "services/payments"
+    ]
+    body["generatedFiles"].append(target)
 
     with pytest.raises(state.StateError, match="must be written before advancing"):
         state.write_topic_evidence(tmp_path, "instructions", body)
 
-    module.write_text("# Payments\n", encoding="utf-8")
+    artifact = tmp_path / target
+    artifact.write_text("# Payments\n", encoding="utf-8")
     with pytest.raises(state.StateError, match="must contain applyTo"):
         state.write_topic_evidence(tmp_path, "instructions", body)
 
-    module.write_text(
-        '---\napplyTo: "src/payments/**"\n---\n\n# Payments\n', encoding="utf-8"
+
+def test_module_artifact_requires_exact_apply_to(tmp_path):
+    _write_instruction_artifacts(tmp_path)
+    body = _instructions_evidence(tmp_path)
+    body["repositoryContext"]["complexModules"] = [
+        {"path": "services/payments", "purpose": "Payment processing"}
+    ]
+    body["moduleKnowledge"] = {"decision": "generate_now"}
+    target = state.module_instruction_targets(tmp_path, ["services/payments"])[
+        "services/payments"
+    ]
+    _write_module_instruction(tmp_path, target, "services/payments")
+    artifact = tmp_path / target
+    artifact.write_text(
+        artifact.read_text(encoding="utf-8").replace(
+            'applyTo: "services/payments/**"',
+            'applyTo: "services/orders/**"',
+        ),
+        encoding="utf-8",
     )
-    written = state.write_topic_evidence(tmp_path, "instructions", body)
-    assert written["evidence"]["pendingModules"] == []
+    body["generatedFiles"].append(target)
+
+    with pytest.raises(state.StateError, match="must use applyTo"):
+        state.write_topic_evidence(tmp_path, "instructions", body)
+
+
+def test_module_artifact_requires_all_sections(tmp_path):
+    _write_instruction_artifacts(tmp_path)
+    body = _instructions_evidence(tmp_path)
+    body["repositoryContext"]["complexModules"] = [
+        {"path": "services/payments", "purpose": "Payment processing"}
+    ]
+    body["moduleKnowledge"] = {"decision": "generate_now"}
+    target = state.module_instruction_targets(tmp_path, ["services/payments"])[
+        "services/payments"
+    ]
+    _write_module_instruction(tmp_path, target, "services/payments")
+    artifact = tmp_path / target
+    artifact.write_text(
+        artifact.read_text(encoding="utf-8").replace(
+            "## Pitfalls", "## Operational Traps"
+        ),
+        encoding="utf-8",
+    )
+    body["generatedFiles"].append(target)
+
+    with pytest.raises(state.StateError, match="missing required section: Pitfalls"):
+        state.write_topic_evidence(tmp_path, "instructions", body)
+
+
+def test_module_artifact_rejects_akmaestro_placeholders(tmp_path):
+    _write_instruction_artifacts(tmp_path)
+    body = _instructions_evidence(tmp_path)
+    body["repositoryContext"]["complexModules"] = [
+        {"path": "services/payments", "purpose": "Payment processing"}
+    ]
+    body["moduleKnowledge"] = {"decision": "generate_now"}
+    target = state.module_instruction_targets(tmp_path, ["services/payments"])[
+        "services/payments"
+    ]
+    _write_module_instruction(tmp_path, target, "services/payments")
+    artifact = tmp_path / target
+    artifact.write_text(
+        artifact.read_text(encoding="utf-8")
+        + "\n<module paths needing scoped instructions>\n",
+        encoding="utf-8",
+    )
+    body["generatedFiles"].append(target)
+
+    with pytest.raises(state.StateError, match="placeholder"):
+        state.write_topic_evidence(tmp_path, "instructions", body)
+
+
+def test_completed_module_instruction_must_be_listed_as_generated(tmp_path):
+    _write_instruction_artifacts(tmp_path)
+    body = _instructions_evidence(tmp_path)
+    body["repositoryContext"]["complexModules"] = [
+        {"path": "services/payments", "purpose": "Payment processing"}
+    ]
+    body["moduleKnowledge"] = {"decision": "generate_now"}
+
+    with pytest.raises(
+        state.StateError, match="completed module instruction is missing"
+    ):
+        state.write_topic_evidence(tmp_path, "instructions", body)
+
+
+def test_pending_module_cannot_be_listed_as_generated(tmp_path):
+    _write_instruction_artifacts(tmp_path)
+    body = _instructions_evidence(tmp_path)
+    body["repositoryContext"]["complexModules"] = [
+        {"path": "services/payments", "purpose": "Payment processing"}
+    ]
+    body["moduleKnowledge"] = {"decision": "generate_now"}
+    body["pendingModules"] = ["services/payments"]
+    target = state.module_instruction_targets(tmp_path, ["services/payments"])[
+        "services/payments"
+    ]
+    _write_module_instruction(tmp_path, target, "services/payments")
+    body["generatedFiles"].append(target)
+
+    with pytest.raises(
+        state.StateError, match="pending module cannot be listed as generated"
+    ):
+        state.write_topic_evidence(tmp_path, "instructions", body)
+
+
+def test_complex_module_artifact_rejects_product_boundary_escape(tmp_path):
+    _write_instruction_artifacts(tmp_path)
+    outside = tmp_path.parent / f"{tmp_path.name}-outside-module"
+    outside.mkdir()
+    module = tmp_path / "services" / "payments"
+    module.parent.mkdir()
+    try:
+        module.symlink_to(outside, target_is_directory=True)
+    except OSError:
+        pytest.skip("directory symlinks are unavailable")
+    body = _instructions_evidence(tmp_path)
+    body["repositoryContext"]["complexModules"] = [
+        {"path": "services/payments", "purpose": "Payment processing"}
+    ]
+    body["moduleKnowledge"] = {"decision": "generate_now"}
+
+    with pytest.raises(state.StateError, match="complex module resolves outside"):
+        state.write_topic_evidence(tmp_path, "instructions", body)
 
 
 def test_blocked_instruction_checks_require_a_blocked_topic_transition(tmp_path):

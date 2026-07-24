@@ -114,6 +114,15 @@ INSTRUCTION_HEADINGS = (
     "Git Workflow",
     "Agent Rules",
 )
+MODULE_INSTRUCTION_HEADINGS = (
+    "Purpose",
+    "Boundaries",
+    "Commands",
+    "Important Paths",
+    "Patterns",
+    "Pitfalls",
+    "Restrictions",
+)
 INSTRUCTION_PLACEHOLDERS = (
     "<team lead: run `/akmaestro-init`",
     "<product description>",
@@ -1531,9 +1540,10 @@ def module_instruction_targets(
 
 
 def _validate_instruction_artifacts(root: Path, evidence: Dict[str, Any]) -> None:
+    repository_root = root.resolve()
     for relative in evidence["generatedFiles"]:
         artifact = (root / relative).resolve()
-        if not _is_within(artifact, root.resolve()):
+        if not _is_within(artifact, repository_root):
             raise StateError(
                 f"instruction artifact resolves outside repository: {relative}"
             )
@@ -1545,6 +1555,68 @@ def _validate_instruction_artifacts(root: Path, evidence: Dict[str, Any]) -> Non
             if not _has_apply_to_frontmatter(scoped):
                 raise StateError(
                     f"scoped instruction {relative} must contain applyTo frontmatter"
+                )
+
+    modules = {item["path"] for item in evidence["repositoryContext"]["complexModules"]}
+    pending = set(evidence["pendingModules"])
+    generated = set(evidence["generatedFiles"])
+    expected_scopes = {f"{module_path}/**" for module_path in modules}
+
+    for module_path in sorted(modules):
+        module_root = (root / module_path).resolve()
+        if not _is_within(module_root, repository_root):
+            raise StateError(
+                f"complex module resolves outside repository: {module_path}"
+            )
+
+    # Reject a claimed module artifact with a bad scope before target derivation
+    # treats the occupied filename as belonging to an unrelated instruction.
+    for relative in sorted(generated - set(INSTRUCTION_FILES)):
+        if not (
+            relative.startswith(".github/instructions/")
+            and relative.endswith(".instructions.md")
+        ):
+            continue
+        text = _read_text_artifact(root / relative, f"module instruction {relative}")
+        if _frontmatter_apply_to(text) not in expected_scopes:
+            raise StateError(
+                f"module instruction {relative} must use applyTo for a confirmed "
+                "complex module"
+            )
+
+    targets = module_instruction_targets(root, sorted(modules))
+    for module_path in sorted(modules):
+        target = targets[module_path]
+        if module_path in pending:
+            if target in generated:
+                raise StateError(
+                    f"pending module cannot be listed as generated: {module_path}"
+                )
+            continue
+        if target not in generated:
+            raise StateError(
+                "completed module instruction is missing from generatedFiles: "
+                f"{module_path}"
+            )
+
+        text = _read_text_artifact(root / target, f"module instruction {target}")
+        expected_scope = f"{module_path}/**"
+        if _frontmatter_apply_to(text) != expected_scope:
+            raise StateError(
+                f"module instruction {target} must use applyTo {expected_scope!r}"
+            )
+        for heading in MODULE_INSTRUCTION_HEADINGS:
+            if not re.search(rf"^##\s+{re.escape(heading)}\s*$", text, re.MULTILINE):
+                raise StateError(
+                    f"module instruction {target} is missing required section: "
+                    f"{heading}"
+                )
+        lowered = text.lower()
+        for marker in INSTRUCTION_PLACEHOLDERS:
+            if marker in lowered:
+                raise StateError(
+                    f"module instruction {target} still contains an AKMaestro "
+                    "placeholder"
                 )
 
     agents = _read_text_artifact(root / "AGENTS.md", "AGENTS.md")
