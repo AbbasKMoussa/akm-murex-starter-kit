@@ -58,9 +58,9 @@ install/remediation actions for:
 - `lsp-<language>` for every selected language;
 - the main and declared-sibling graph artifacts.
 
-Paths and working directories are repository-relative POSIX paths. Commands are
-argument arrays, never shell strings. Credentials and local command output are
-not committed. Run `readiness-check` after writing requirements.
+Paths and working directories are AKMaestro-root-relative POSIX paths. Commands
+are argument arrays, never shell strings. Credentials and local command output
+are not committed. Run `readiness-check` after writing requirements.
 
 ## Strict evidence
 

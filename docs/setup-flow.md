@@ -297,13 +297,15 @@ exact shared/local/blocked/pending inventories. It is idempotent and resumable.
 An existing unowned team guide is never replaced without explicit confirmation
 of the `setup-finalize --preview` diff and the `--approved-guide-replace` flag.
 
-The lead reviews and commits the shared inventory. Developers then pull that
-commit and run `/feature`. `/feature` validates committed initialization, probes
-the current developer's `uv`, Graphifyy, LSPs, and local graphs, and offers each
-recorded remediation action for confirmation. It executes only the confirmed
-argument array through controller-owned `remediation-run --approved`, without a
-shell and only in a declared writable repository. It never sends a developer
-back through repository initialization.
+The shared inventory includes every validated instructions-evidence
+`generatedFiles` path, including scoped module artifacts. The lead reviews and
+commits that inventory. Developers then pull that commit and run `/feature`.
+`/feature` validates committed initialization, probes the current developer's
+`uv`, Graphifyy, LSPs, and local graphs, and offers each recorded remediation
+action for confirmation. It executes only the confirmed argument array through
+controller-owned `remediation-run --approved`, without a shell and only in a
+declared writable repository. It never sends a developer back through repository
+initialization.
 
 `/status` is the read-only answer to “where are we?” Setup takes precedence until
 finalization succeeds; afterward it reports readiness and feature progress.

@@ -885,7 +885,9 @@ In `doctor/SKILL.md`, use:
 
 ```text
 - generate_now + pending + instructions in_progress: warn as unfinished setup;
-- generate_now + pending + instructions complete: fail as invalid controller state;
+- generate_now may reach complete or blocked only after every selected module is
+  generated and validated; pending modules in either terminal state fail as an
+  invalid controller state;
 - defer + pending: warn with each controller-returned follow-up command;
 - not_applicable + non-empty modules: fail contract validation.
 ```
@@ -1085,7 +1087,7 @@ rg -n "pending module-scoped files are warnings|pendingModules|moduleKnowledge|m
 
 Expected: every pending-module statement distinguishes `generate_now` from
 `defer`; all evidence examples include `moduleKnowledge`; all scoped-artifact
-guidance uses product-relative POSIX paths.
+guidance uses AKMaestro-root-relative POSIX paths.
 
 - [ ] **Step 10: Commit documentation after all validation passes**
 

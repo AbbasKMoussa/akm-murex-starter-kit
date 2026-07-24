@@ -41,7 +41,7 @@ because a directory was detected as a complex module.
 During `/akmaestro-init`, the `setup-instructions` topic presents complex-module
 candidates as part of the sourced repository proposal. Each candidate includes:
 
-- repository-relative path;
+- AKMaestro-root-relative path;
 - proposed purpose;
 - strongest source;
 - confidence (`high`, `medium`, or `low`);
