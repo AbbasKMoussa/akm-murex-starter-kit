@@ -94,8 +94,9 @@ The existing fields retain distinct responsibilities:
 - `repositoryContext.complexModules` is the lead-confirmed module list.
 - `pendingModules` is the subset that does not yet have validated scoped
   knowledge.
-- `generatedFiles` contains the root instruction artifacts and each validated
-  module instruction artifact.
+- `generatedFiles` contains only the root instruction artifacts, each validated
+  controller-derived scoped module target, and any explicitly requested nested
+  `<module>/AGENTS.md` listed alongside its completed scoped target.
 
 The controller enforces these invariants:
 
@@ -109,6 +110,9 @@ The controller enforces these invariants:
    are rejected until `pendingModules` is empty.
 5. `defer` permits an instructions transition to `complete` with pending modules;
    those modules remain warnings in status and finalization output.
+6. A nested `<module>/AGENTS.md` is valid only for a confirmed completed module,
+   cannot replace its required scoped target, and enters the shared inventory
+   when listed in `generatedFiles`.
 
 The instructions evidence schema and bundled evidence example will be updated
 with the new required object. Because AKMaestro has not shipped, the existing

@@ -103,7 +103,8 @@ begins before instructions evidence exists:
   generated targets, and all status/finalization output.
 
 For every path, confirm the default artifact is a scoped instruction file and
-that a nested module `AGENTS.md` appears only after a separate explicit request.
+that a nested module `AGENTS.md` appears only after a separate explicit request,
+is listed in the shared inventory, and never replaces the required scoped file.
 
 ## Phase 3: Hook scripts while disabled
 

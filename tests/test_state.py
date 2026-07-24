@@ -208,6 +208,17 @@ def _write_module_instruction(root, relative, module_path):
     )
 
 
+def _write_nested_module_agents(root, module_path, extra=""):
+    target = root / module_path / "AGENTS.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        "# Module Agent Instructions\n\n"
+        "Use the scoped GitHub instruction file for module-specific guidance.\n"
+        f"{extra}",
+        encoding="utf-8",
+    )
+
+
 def _advance_setup(root: Path, topic: str, terminal: str = "complete"):
     current = state._read_json(state._setup_path(root))
     state.setup_transition(
@@ -977,6 +988,157 @@ def test_valid_module_artifact_is_accepted(tmp_path):
     written = state.write_topic_evidence(tmp_path, "instructions", body)
 
     assert written["evidence"]["pendingModules"] == []
+
+
+def test_unrelated_generated_file_is_rejected_even_when_it_exists(tmp_path):
+    _write_instruction_artifacts(tmp_path)
+    (tmp_path / ".env").write_text("EXAMPLE=value\n", encoding="utf-8")
+    body = _instructions_evidence(tmp_path)
+    body["generatedFiles"].append(".env")
+
+    with pytest.raises(state.StateError, match="generatedFiles contains unexpected"):
+        state.write_topic_evidence(tmp_path, "instructions", body)
+
+
+def test_tampered_unrelated_generated_file_cannot_enter_inventory(tmp_path):
+    state.setup_init(tmp_path)
+    state.setup_transition(tmp_path, "instructions", "in_progress", expected_revision=0)
+    _write_instruction_artifacts(tmp_path)
+    (tmp_path / ".env").write_text("EXAMPLE=value\n", encoding="utf-8")
+    state.write_topic_evidence(
+        tmp_path,
+        "instructions",
+        _instructions_evidence(tmp_path),
+    )
+    evidence_path = tmp_path / ".agentic" / "setup" / "instructions-state.json"
+    tampered = json.loads(evidence_path.read_text(encoding="utf-8"))
+    tampered["evidence"]["generatedFiles"].append(".env")
+    evidence_path.write_text(json.dumps(tampered), encoding="utf-8")
+
+    with pytest.raises(state.StateError, match="generatedFiles contains unexpected"):
+        state.setup_status(tmp_path)
+
+
+def test_unrelated_scoped_instruction_is_rejected(tmp_path):
+    _write_instruction_artifacts(tmp_path)
+    unrelated = ".github/instructions/orders.instructions.md"
+    _write_module_instruction(tmp_path, unrelated, "services/orders")
+    body = _instructions_evidence(tmp_path)
+    body["generatedFiles"].append(unrelated)
+
+    with pytest.raises(state.StateError, match="confirmed complex module"):
+        state.write_topic_evidence(tmp_path, "instructions", body)
+
+
+def test_optional_nested_agents_is_accepted_and_included_in_inventory(tmp_path):
+    state.setup_init(tmp_path)
+    state.setup_transition(tmp_path, "instructions", "in_progress", expected_revision=0)
+    _write_instruction_artifacts(tmp_path)
+    module_path = "services/payments"
+    body = _instructions_evidence(tmp_path)
+    body["repositoryContext"]["complexModules"] = [
+        {"path": module_path, "purpose": "Payment processing"}
+    ]
+    body["moduleKnowledge"] = {"decision": "generate_now"}
+    target = state.module_instruction_targets(tmp_path, [module_path])[module_path]
+    nested_agents = f"{module_path}/AGENTS.md"
+    _write_module_instruction(tmp_path, target, module_path)
+    _write_nested_module_agents(tmp_path, module_path)
+    body["generatedFiles"].extend((target, nested_agents))
+    state.write_topic_evidence(tmp_path, "instructions", body)
+    state.setup_transition(tmp_path, "instructions", "complete", expected_revision=1)
+    for topic in ("tooling", "skills"):
+        _advance_setup(tmp_path, topic)
+    _advance_setup(tmp_path, "hooks", "skipped")
+    current = state._read_json(state._setup_path(tmp_path))
+
+    finalized = state.finalize_setup(
+        tmp_path,
+        expected_revision=current["revision"],
+    )
+
+    assert target in finalized["sharedFiles"]
+    assert nested_agents in finalized["sharedFiles"]
+
+
+def test_nested_agents_cannot_replace_required_scoped_target(tmp_path):
+    _write_instruction_artifacts(tmp_path)
+    module_path = "services/payments"
+    body = _instructions_evidence(tmp_path)
+    body["repositoryContext"]["complexModules"] = [
+        {"path": module_path, "purpose": "Payment processing"}
+    ]
+    body["moduleKnowledge"] = {"decision": "generate_now"}
+    _write_nested_module_agents(tmp_path, module_path)
+    body["generatedFiles"].append(f"{module_path}/AGENTS.md")
+
+    with pytest.raises(
+        state.StateError, match="completed module instruction is missing"
+    ):
+        state.write_topic_evidence(tmp_path, "instructions", body)
+
+
+def test_unconfirmed_nested_agents_is_rejected(tmp_path):
+    _write_instruction_artifacts(tmp_path)
+    module_path = "services/payments"
+    _write_nested_module_agents(tmp_path, module_path)
+    body = _instructions_evidence(tmp_path)
+    body["generatedFiles"].append(f"{module_path}/AGENTS.md")
+
+    with pytest.raises(state.StateError, match="generatedFiles contains unexpected"):
+        state.write_topic_evidence(tmp_path, "instructions", body)
+
+
+def test_pending_module_nested_agents_is_rejected(tmp_path):
+    _write_instruction_artifacts(tmp_path)
+    module_path = "services/payments"
+    _write_nested_module_agents(tmp_path, module_path)
+    body = _instructions_evidence(tmp_path)
+    body["repositoryContext"]["complexModules"] = [
+        {"path": module_path, "purpose": "Payment processing"}
+    ]
+    body["moduleKnowledge"] = {"decision": "generate_now"}
+    body["pendingModules"] = [module_path]
+    body["generatedFiles"].append(f"{module_path}/AGENTS.md")
+
+    with pytest.raises(state.StateError, match="generatedFiles contains unexpected"):
+        state.write_topic_evidence(tmp_path, "instructions", body)
+
+
+def test_nested_agents_rejects_akmaestro_placeholders(tmp_path):
+    _write_instruction_artifacts(tmp_path)
+    module_path = "services/payments"
+    body = _instructions_evidence(tmp_path)
+    body["repositoryContext"]["complexModules"] = [
+        {"path": module_path, "purpose": "Payment processing"}
+    ]
+    body["moduleKnowledge"] = {"decision": "generate_now"}
+    target = state.module_instruction_targets(tmp_path, [module_path])[module_path]
+    _write_module_instruction(tmp_path, target, module_path)
+    _write_nested_module_agents(tmp_path, module_path, "\n<module-path>\n")
+    body["generatedFiles"].extend((target, f"{module_path}/AGENTS.md"))
+
+    with pytest.raises(state.StateError, match="nested AGENTS.md.*placeholder"):
+        state.write_topic_evidence(tmp_path, "instructions", body)
+
+
+def test_nested_agents_rejects_empty_file(tmp_path):
+    _write_instruction_artifacts(tmp_path)
+    module_path = "services/payments"
+    body = _instructions_evidence(tmp_path)
+    body["repositoryContext"]["complexModules"] = [
+        {"path": module_path, "purpose": "Payment processing"}
+    ]
+    body["moduleKnowledge"] = {"decision": "generate_now"}
+    target = state.module_instruction_targets(tmp_path, [module_path])[module_path]
+    _write_module_instruction(tmp_path, target, module_path)
+    nested_agents = tmp_path / module_path / "AGENTS.md"
+    nested_agents.parent.mkdir(parents=True, exist_ok=True)
+    nested_agents.write_text("", encoding="utf-8")
+    body["generatedFiles"].extend((target, f"{module_path}/AGENTS.md"))
+
+    with pytest.raises(state.StateError, match="nested AGENTS.md.*must not be empty"):
+        state.write_topic_evidence(tmp_path, "instructions", body)
 
 
 def test_module_artifact_claim_requires_existing_scoped_file(tmp_path):

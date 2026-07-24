@@ -1598,6 +1598,18 @@ def module_instruction_targets(
 
 def _validate_instruction_artifacts(root: Path, evidence: Dict[str, Any]) -> None:
     repository_root = root.resolve()
+    modules = {item["path"] for item in evidence["repositoryContext"]["complexModules"]}
+    pending = set(evidence["pendingModules"])
+    generated = set(evidence["generatedFiles"])
+    expected_scopes = {f"{module_path}/**" for module_path in modules}
+
+    for module_path in sorted(modules):
+        module_root = (root / module_path).resolve()
+        if not _is_within(module_root, repository_root):
+            raise StateError(
+                f"complex module resolves outside repository: {module_path}"
+            )
+
     for relative in evidence["generatedFiles"]:
         artifact = (root / relative).resolve()
         if not _is_within(artifact, repository_root):
@@ -1613,18 +1625,6 @@ def _validate_instruction_artifacts(root: Path, evidence: Dict[str, Any]) -> Non
                 raise StateError(
                     f"scoped instruction {relative} must contain applyTo frontmatter"
                 )
-
-    modules = {item["path"] for item in evidence["repositoryContext"]["complexModules"]}
-    pending = set(evidence["pendingModules"])
-    generated = set(evidence["generatedFiles"])
-    expected_scopes = {f"{module_path}/**" for module_path in modules}
-
-    for module_path in sorted(modules):
-        module_root = (root / module_path).resolve()
-        if not _is_within(module_root, repository_root):
-            raise StateError(
-                f"complex module resolves outside repository: {module_path}"
-            )
 
     # Reject a claimed module artifact with a bad scope before target derivation
     # treats the occupied filename as belonging to an unrelated instruction.
@@ -1642,6 +1642,24 @@ def _validate_instruction_artifacts(root: Path, evidence: Dict[str, Any]) -> Non
             )
 
     targets = module_instruction_targets(root, sorted(modules))
+    for module_path in sorted(pending):
+        if targets[module_path] in generated:
+            raise StateError(
+                f"pending module cannot be listed as generated: {module_path}"
+            )
+
+    completed = modules - pending
+    allowed_generated = set(INSTRUCTION_FILES)
+    for module_path in completed:
+        allowed_generated.add(targets[module_path])
+        allowed_generated.add(f"{module_path}/AGENTS.md")
+    unexpected = sorted(generated - allowed_generated)
+    if unexpected:
+        raise StateError(
+            "instructions evidence.generatedFiles contains unexpected files: "
+            + ", ".join(unexpected)
+        )
+
     for module_path in sorted(modules):
         target = targets[module_path]
         if module_path in pending:
@@ -1675,6 +1693,24 @@ def _validate_instruction_artifacts(root: Path, evidence: Dict[str, Any]) -> Non
                     f"module instruction {target} still contains an AKMaestro "
                     "placeholder"
                 )
+
+        nested_agents = f"{module_path}/AGENTS.md"
+        if nested_agents in generated:
+            nested = _read_text_artifact(
+                root / nested_agents,
+                f"nested AGENTS.md for {module_path}",
+            )
+            if not nested.strip():
+                raise StateError(
+                    f"nested AGENTS.md for {module_path} must not be empty"
+                )
+            lowered = nested.lower()
+            for marker in INSTRUCTION_PLACEHOLDERS:
+                if marker in lowered:
+                    raise StateError(
+                        f"nested AGENTS.md for {module_path} still contains an "
+                        "AKMaestro placeholder"
+                    )
 
     agents = _read_text_artifact(root / "AGENTS.md", "AGENTS.md")
     lowered = agents.lower()

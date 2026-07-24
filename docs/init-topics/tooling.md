@@ -89,5 +89,5 @@ command or Copilot must reload. Persist evidence and requirements first. The
 sole resume instruction is:
 
 ```text
-Next: open a new Copilot session at the repository root and run /akmaestro-init
+Next: open a new Copilot session at the AKMaestro root and run /akmaestro-init
 ```

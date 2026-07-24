@@ -300,7 +300,10 @@ Restrictions sections. Detect these first and present one compact sourced
 draft; ask only about missing, conflicting, or low-confidence facts.
 
 If the lead explicitly requests a cross-agent instruction file, create
-`<module>/AGENTS.md` instead of or alongside the scoped GitHub instruction file.
+`<module>/AGENTS.md` alongside the scoped GitHub instruction file. It is
+optional and never replaces the controller target. Append the nested path to
+`generatedFiles` only when the confirmed module is complete and its required
+scoped target is also listed; both paths then enter the final shared inventory.
 Existing files still use the reviewed merge protocol.
 
 ### Module Completion Criteria
@@ -310,7 +313,9 @@ A module is complete when:
 - the confirmed scoped instruction artifact exists with valid `applyTo`;
 - the file documents all seven required sections without placeholders;
 - a successful atomic instructions-evidence revision adds the controller target
-  to `generatedFiles` and removes the module from `pendingModules`.
+  to `generatedFiles` and removes the module from `pendingModules`;
+- when explicitly requested, the nonempty, placeholder-free nested `AGENTS.md`
+  is listed only alongside that required scoped target.
 
 Process pending modules in normalized path order and revise evidence after each
 successful validation. There is no second module-status file. A declined merge

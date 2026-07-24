@@ -113,6 +113,11 @@ prepared `generatedFiles` and `pendingModules` revision through `evidence-write
 instructions --input <local-evidence-json> --expected-revision
 <latest-evidence-revision>`. A successful write validates the artifact and is
 atomic, so an invalid artifact leaves the prior revision resumable.
+An explicitly requested nested `<module>/AGENTS.md` is optional. List it in
+`generatedFiles` only alongside that completed module's required
+controller-derived scoped target; it cannot replace the target or be listed for
+an unconfirmed or pending module. Both listed artifacts enter the shared
+inventory.
 `setup-status` returns `moduleKnowledge` with completed and pending module lists
 plus a controller-derived pending-item command for each remaining module.
 

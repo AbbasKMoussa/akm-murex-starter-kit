@@ -141,9 +141,12 @@ The default artifact is
 `.github/instructions/<module-id>.instructions.md`, with a product-relative
 POSIX `applyTo: "<module-path>/**"` scope. The controller's `module-targets`
 command is the filename authority. Nested `<module>/AGENTS.md` files are
-generated only after a separate explicit request. Evidence is revised after
-each validated module, so an interrupted `generate_now` run resumes at the
-first pending module through `/akmaestro-init`.
+generated only after a separate explicit request and may accompany, never
+replace, the required scoped target. The nested path is added to
+`generatedFiles` only alongside its completed module target, so both enter the
+shared inventory. Evidence is revised after each validated module, so an
+interrupted `generate_now` run resumes at the first pending module through
+`/akmaestro-init`.
 
 ## Existing-file changes
 

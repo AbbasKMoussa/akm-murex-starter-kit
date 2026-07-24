@@ -138,8 +138,9 @@ finalization unavailable, until every selected module validates. Declining
 records `defer`, allows setup to finish, and preserves an exact
 `/setup-instructions module <path>` follow-up for each pending module. No
 confirmed modules records `not_applicable`. Module files default to
-`.github/instructions/`; nested module `AGENTS.md` files are opt-in. An
-interrupted accepted run resumes through `/akmaestro-init`.
+`.github/instructions/`; nested module `AGENTS.md` files are opt-in companions
+and never replace the required scoped files. An interrupted accepted run
+resumes through `/akmaestro-init`.
 
 On completion it writes **`.github/AGENTIC.md`**, a committed guide so every
 teammate knows what's installed and how to use it. Review and commit the

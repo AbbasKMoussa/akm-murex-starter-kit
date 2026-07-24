@@ -276,7 +276,10 @@ Every section must contain confirmed, module-specific guidance and no
 placeholder. State explicitly when a section has no module-specific difference
 from root guidance; do not duplicate that general guidance. A nested
 `<module>/AGENTS.md` is a separate, explicitly requested cross-agent artifact;
-it may accompany but never replace the controller-targeted scoped file.
+it may accompany but never replace the controller-targeted scoped file. When
+requested, append its exact path to `generatedFiles` only alongside the
+completed module's controller target. This makes both artifacts part of the
+shared inventory the lead reviews and commits.
 
 Create a missing target directly. For an existing target, use `merge-plan`,
 show the exact diff, and call `merge-apply --approved` only after approval.
@@ -285,14 +288,18 @@ Declining an existing-file merge leaves that module pending. It does not alter
 
 For each scoped artifact, prepare the next evidence input by appending its
 returned target to `generatedFiles` and removing only that module from
-`pendingModules`. Call `evidence-write instructions` with the latest evidence
-revision; only a successful controller write marks that artifact validated and
-advances the evidence revision. Never batch an unvalidated artifact into
-evidence or maintain another module-status file. If the lead no longer accepts
-generation now, explicitly confirm changing `generate_now` to `defer`, write
-that new evidence revision, and only then allow the topic to complete. The
-controller-returned `/setup-instructions module <path>` commands remain the
-deferred follow-ups for `module <path>` or `module all`.
+`pendingModules`. When the lead requested the optional nested `AGENTS.md`,
+append its exact `<module>/AGENTS.md` path in the same evidence only after both
+it and the required scoped target are complete. Call `evidence-write
+instructions` with the latest evidence revision; only a successful controller
+write marks those artifacts validated and advances the evidence revision.
+Never list a nested `AGENTS.md` for an unconfirmed or pending module, batch an
+unvalidated artifact into evidence, or maintain another module-status file. If
+the lead no longer accepts generation now, explicitly confirm changing
+`generate_now` to `defer`, write that new evidence revision, and only then allow
+the topic to complete. The controller-returned `/setup-instructions module
+<path>` commands remain the deferred follow-ups for `module <path>` or `module
+all`.
 
 ## Completion
 
