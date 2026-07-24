@@ -303,14 +303,14 @@ or have documented environmental blockers; at least one verification path
 exists; and every Git policy is defined or explicitly absent/unspecified.
 
 With `generate_now`, pending modules are unfinished accepted work and the
-controller rejects instructions completion. With `defer`, pending modules are
-non-blocking follow-ups. With `not_applicable`, both confirmed and pending module
-lists must be empty.
+controller rejects either terminal instructions state (`complete` or `blocked`).
+With `defer`, pending modules are non-blocking follow-ups. With
+`not_applicable`, both confirmed and pending module lists must be empty.
 
 Write evidence first, then make the final aggregate transition using the latest
-setup-state revision. If any command result is `blocked`, transition
-instructions to `blocked --reason <reason>`; otherwise transition to `complete`
-only after the controller accepts it. Rerun `setup-status` and return to the
-orchestrator, which loads the next installed topic skill in the same session.
-If a restart is genuinely required, the only resume command is
-`/akmaestro-init`.
+setup-state revision. A blocked command result may transition instructions to
+`blocked` only after accepted module generation has no pending modules. Use
+`blocked --reason <reason>`; otherwise transition to `complete` only after the
+controller accepts it. Rerun `setup-status` and return to the orchestrator,
+which loads the next installed topic skill in the same session. If a restart is
+genuinely required, the only resume command is `/akmaestro-init`.

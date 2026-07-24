@@ -95,8 +95,8 @@ same read-only diff before an unowned `.github/AGENTIC.md` may be replaced.
 Instructions evidence records a required `moduleKnowledge.decision`:
 
 - `generate_now`: the lead accepted generation for every confirmed complex
-  module. All begin in `pendingModules`, and the controller refuses to complete
-  instructions until none remain.
+  module. All begin in `pendingModules`, and the controller refuses either
+  terminal instructions state (`complete` or `blocked`) until none remain.
 - `defer`: confirmed modules may remain pending while instructions completes.
   The controller retains a follow-up command for each.
 - `not_applicable`: both confirmed complex modules and `pendingModules` must be
@@ -119,9 +119,11 @@ plus a controller-derived pending-item command for each remaining module.
 When `generate_now` remains pending, instructions stays `in_progress`,
 `setup-status.nextCommand` remains `/akmaestro-init`, and that is the only
 cross-session resume command. Accepted generation may change to `defer` only
-after explicit lead confirmation and a new evidence revision. Deferred
-post-setup work uses each returned `/setup-instructions module <path>` command
-and does not reopen the completed setup topic.
+after explicit lead confirmation and a new evidence revision. A blocked command
+result may transition instructions to `blocked` only after accepted module
+generation has no pending modules. Deferred post-setup work uses each returned
+`/setup-instructions module <path>` command and does not reopen the completed
+setup topic.
 
 ## Repository and developer readiness
 

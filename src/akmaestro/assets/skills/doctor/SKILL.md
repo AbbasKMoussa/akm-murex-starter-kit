@@ -65,9 +65,11 @@ fix when not `ok`.
   **fail** (`/setup-instructions` rewrites it after confirmation).
 - Configured build/test/lint/typecheck/verify actions are `passed` or genuinely
   `blocked`; passing results contain one matching hashed check per action;
-  bootstrap/run may be `documented`. A blocked result paired with a complete
-  instructions topic, an omitted/substituted action check, or an ordinary
-  failed/skipped result → **fail**.
+  bootstrap/run may be `documented`. A blocked command result may transition
+  instructions to `blocked` only after accepted module generation has no pending
+  modules. A blocked result paired with a complete instructions topic, an
+  omitted/substituted action check, or an ordinary failed/skipped result →
+  **fail**.
 - `.github/AGENTIC.md` (team-discoverability guide) exists. Missing → **warn**
   (regenerate via `/akmaestro-init`).
 - `.github/copilot-instructions.md` exists and is short/pointer-only. If it is
@@ -79,8 +81,8 @@ fix when not `ok`.
   controller's `setup-status` module inventory:
   - `generate_now` with pending modules while instructions is `in_progress` →
     **warn** as unfinished setup; fix with `/akmaestro-init`.
-  - `generate_now` with pending modules while instructions is `complete` →
-    **fail** as invalid controller state.
+  - `generate_now` with pending modules forbids either terminal instructions
+    state (`complete` or `blocked`) → **fail** as invalid controller state.
   - `defer` with pending modules → **warn** and print each controller-returned
     follow-up command.
   - `not_applicable` with any confirmed or pending module → **fail** contract

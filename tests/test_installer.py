@@ -148,6 +148,15 @@ def test_init_skills_define_controller_bound_module_knowledge_flow():
     assert "Generate scoped knowledge for all selected modules now?" in setup
     assert "module-targets" in setup
     assert "generate_now" in setup and "defer" in setup
+    terminal_rule = "terminal instructions state (`complete` or `blocked`)"
+    blocked_rule = (
+        "blocked command result may transition instructions to `blocked` only after "
+        "accepted module generation has no pending modules"
+    )
+    for text in (setup, doctor, protocol):
+        normalized = " ".join(text.split())
+        assert terminal_rule in normalized
+        assert blocked_rule in normalized
     assert "source" in setup and "confidence" in setup
     assert "parent/child" in setup
     assert "declining" in setup and "pending" in setup
