@@ -609,6 +609,8 @@ def validate_setup_integrity(root: Path, state: Dict[str, Any]) -> None:
         if evidence["topic"] != topic:
             raise StateError(f"setup evidence topic mismatch for {topic}")
         _validate_topic_artifacts(root, evidence)
+        if topic == "instructions" and state["topics"][topic]["status"] == "complete":
+            _validate_instruction_completion(evidence["evidence"])
     if state["topics"]["tooling"]["status"] in {"complete", "blocked"}:
         validate_requirements(_read_json(_requirements_path(root)))
     if _action_checks_path(root).is_file():
@@ -646,9 +648,11 @@ def setup_transition(
         state = _read_json(path)
         validate_setup_state(state)
         current = state["topics"][topic]
-        if current["status"] == status and current.get("blocker") == reason:
+        idempotent = current["status"] == status and current.get("blocker") == reason
+        if idempotent and status not in {"complete", "blocked"}:
             return state
-        _expect_revision(state, expected_revision)
+        if not idempotent:
+            _expect_revision(state, expected_revision)
 
         allowed = {
             "pending": {"in_progress", "skipped"},
@@ -657,7 +661,7 @@ def setup_transition(
             "blocked": {"in_progress"},
             "skipped": {"in_progress"},
         }
-        if status not in allowed[current["status"]]:
+        if not idempotent and status not in allowed[current["status"]]:
             raise StateError(
                 f"illegal setup transition for {topic}: {current['status']} -> {status}"
             )
@@ -671,6 +675,8 @@ def setup_transition(
             if evidence["topic"] != topic:
                 raise StateError(f"setup evidence topic mismatch for {topic}")
             _validate_topic_artifacts(root, evidence)
+            if topic == "instructions" and status == "complete":
+                _validate_instruction_completion(evidence["evidence"])
             has_blockers = _topic_has_blockers(topic, evidence["evidence"])
             if status == "complete" and has_blockers:
                 raise StateError(
@@ -712,6 +718,8 @@ def setup_transition(
                     raise StateError(
                         "enabled hooks cannot complete until every selected check passes"
                     )
+        if idempotent:
+            return state
 
         now = _now()
         current["status"] = status
@@ -1249,6 +1257,17 @@ def validate_instructions_evidence(evidence: Dict[str, Any]) -> None:
     if decision in {"generate_now", "defer"} and not module_paths:
         raise StateError(
             f"moduleKnowledge {decision} requires at least one complex module"
+        )
+
+
+def _validate_instruction_completion(evidence: Dict[str, Any]) -> None:
+    if (
+        evidence["moduleKnowledge"]["decision"] == "generate_now"
+        and evidence["pendingModules"]
+    ):
+        raise StateError(
+            "instructions cannot complete because accepted module generation "
+            "still has pending modules"
         )
 
 
@@ -2712,13 +2731,35 @@ def _setup_inventory(root: Path, state: Dict[str, Any]) -> Dict[str, Any]:
         if item["status"] == "blocked"
     ]
     pending: List[Dict[str, str]] = []
+    module_knowledge = None
     instructions_path = root / ".agentic" / "setup" / "instructions-state.json"
     if instructions_path.is_file():
         instructions = _read_json(instructions_path)
         validate_topic_evidence(instructions)
+        body = instructions["evidence"]
+        if state["topics"]["instructions"]["status"] == "complete":
+            _validate_instruction_completion(body)
+        confirmed = sorted(
+            module["path"] for module in body["repositoryContext"]["complexModules"]
+        )
+        pending_modules = sorted(body["pendingModules"])
+        pending_set = set(pending_modules)
+        module_knowledge = {
+            "decision": body["moduleKnowledge"]["decision"],
+            "completedModules": [
+                module_path
+                for module_path in confirmed
+                if module_path not in pending_set
+            ],
+            "pendingModules": pending_modules,
+        }
         pending.extend(
-            {"type": "module", "path": path}
-            for path in instructions["evidence"]["pendingModules"]
+            {
+                "type": "module",
+                "path": module_path,
+                "command": f"/setup-instructions module {module_path}",
+            }
+            for module_path in pending_modules
         )
 
     shared = {
@@ -2750,6 +2791,7 @@ def _setup_inventory(root: Path, state: Dict[str, Any]) -> Dict[str, Any]:
         "localPaths": [".agentic/local/", ".agentic/audit/"],
         "blockedItems": blocked,
         "pendingItems": pending,
+        "moduleKnowledge": module_knowledge,
     }
 
 

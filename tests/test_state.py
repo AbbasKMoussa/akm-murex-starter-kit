@@ -1057,6 +1057,203 @@ def test_complex_module_artifact_rejects_product_boundary_escape(tmp_path):
         state.write_topic_evidence(tmp_path, "instructions", body)
 
 
+def test_generate_now_cannot_complete_with_pending_modules(tmp_path):
+    state.setup_init(tmp_path)
+    state.setup_transition(tmp_path, "instructions", "in_progress", expected_revision=0)
+    _write_instruction_artifacts(tmp_path)
+    body = _instructions_evidence(tmp_path)
+    body["moduleKnowledge"] = {"decision": "generate_now"}
+    body["repositoryContext"]["complexModules"] = [
+        {"path": "services/payments", "purpose": "Payment processing"}
+    ]
+    body["pendingModules"] = ["services/payments"]
+    state.write_topic_evidence(tmp_path, "instructions", body)
+
+    with pytest.raises(state.StateError, match="accepted module generation"):
+        state.setup_transition(
+            tmp_path, "instructions", "complete", expected_revision=1
+        )
+
+    current = state._read_json(state._setup_path(tmp_path))
+    assert current["revision"] == 1
+    assert current["topics"]["instructions"]["status"] == "in_progress"
+
+
+def test_generate_now_completes_after_all_modules_are_generated(tmp_path):
+    state.setup_init(tmp_path)
+    state.setup_transition(tmp_path, "instructions", "in_progress", expected_revision=0)
+    _write_instruction_artifacts(tmp_path)
+    body = _instructions_evidence(tmp_path)
+    body["moduleKnowledge"] = {"decision": "generate_now"}
+    body["repositoryContext"]["complexModules"] = [
+        {"path": "services/payments", "purpose": "Payment processing"}
+    ]
+    target = state.module_instruction_targets(tmp_path, ["services/payments"])[
+        "services/payments"
+    ]
+    _write_module_instruction(tmp_path, target, "services/payments")
+    body["generatedFiles"].append(target)
+    state.write_topic_evidence(tmp_path, "instructions", body)
+
+    completed = state.setup_transition(
+        tmp_path, "instructions", "complete", expected_revision=1
+    )
+
+    assert completed["topics"]["instructions"]["status"] == "complete"
+
+
+def test_deferred_modules_complete_with_actionable_inventory(tmp_path):
+    state.setup_init(tmp_path)
+    state.setup_transition(tmp_path, "instructions", "in_progress", expected_revision=0)
+    _write_instruction_artifacts(tmp_path)
+    body = _instructions_evidence(tmp_path)
+    body["moduleKnowledge"] = {"decision": "defer"}
+    body["repositoryContext"]["complexModules"] = [
+        {"path": "services/payments", "purpose": "Payment processing"}
+    ]
+    body["pendingModules"] = ["services/payments"]
+    state.write_topic_evidence(tmp_path, "instructions", body)
+    state.setup_transition(tmp_path, "instructions", "complete", expected_revision=1)
+
+    report = state.setup_status(tmp_path)
+    assert report["moduleKnowledge"] == {
+        "decision": "defer",
+        "completedModules": [],
+        "pendingModules": ["services/payments"],
+    }
+    assert report["pendingItems"] == [
+        {
+            "type": "module",
+            "path": "services/payments",
+            "command": "/setup-instructions module services/payments",
+        }
+    ]
+
+    for topic in ("tooling", "skills"):
+        _advance_setup(tmp_path, topic)
+    _advance_setup(tmp_path, "hooks", "skipped")
+    current = state._read_json(state._setup_path(tmp_path))
+    finalized = state.finalize_setup(
+        tmp_path,
+        expected_revision=current["revision"],
+    )
+    assert finalized["overall"] == "complete"
+    assert finalized["moduleKnowledge"] == report["moduleKnowledge"]
+    assert finalized["pendingItems"] == report["pendingItems"]
+
+
+def test_partial_module_resume_reports_completed_and_pending_modules(tmp_path):
+    state.setup_init(tmp_path)
+    state.setup_transition(tmp_path, "instructions", "in_progress", expected_revision=0)
+    _write_instruction_artifacts(tmp_path)
+    modules = [
+        {"path": "services/payments", "purpose": "Payment processing"},
+        {"path": "services/orders", "purpose": "Order processing"},
+    ]
+    body = _instructions_evidence(tmp_path)
+    body["moduleKnowledge"] = {"decision": "generate_now"}
+    body["repositoryContext"]["complexModules"] = modules
+    body["pendingModules"] = [module["path"] for module in modules]
+    first = state.write_topic_evidence(tmp_path, "instructions", body)
+
+    target = state.module_instruction_targets(tmp_path, ["services/payments"])[
+        "services/payments"
+    ]
+    _write_module_instruction(tmp_path, target, "services/payments")
+    resumed = copy.deepcopy(body)
+    resumed["generatedFiles"].append(target)
+    resumed["pendingModules"] = ["services/orders"]
+    second = state.write_topic_evidence(
+        tmp_path,
+        "instructions",
+        resumed,
+        expected_revision=first["revision"],
+    )
+
+    report = state.setup_status(tmp_path)
+    assert second["revision"] == 1
+    assert report["moduleKnowledge"] == {
+        "decision": "generate_now",
+        "completedModules": ["services/payments"],
+        "pendingModules": ["services/orders"],
+    }
+    assert report["pendingItems"] == [
+        {
+            "type": "module",
+            "path": "services/orders",
+            "command": "/setup-instructions module services/orders",
+        }
+    ]
+    assert report["nextCommand"] == "/akmaestro-init"
+
+
+def test_module_knowledge_decision_can_be_revised_before_completion(tmp_path):
+    state.setup_init(tmp_path)
+    state.setup_transition(tmp_path, "instructions", "in_progress", expected_revision=0)
+    _write_instruction_artifacts(tmp_path)
+    body = _instructions_evidence(tmp_path)
+    body["moduleKnowledge"] = {"decision": "generate_now"}
+    body["repositoryContext"]["complexModules"] = [
+        {"path": "services/payments", "purpose": "Payment processing"}
+    ]
+    body["pendingModules"] = ["services/payments"]
+    first = state.write_topic_evidence(tmp_path, "instructions", body)
+
+    deferred = copy.deepcopy(body)
+    deferred["moduleKnowledge"] = {"decision": "defer"}
+    revised = state.write_topic_evidence(
+        tmp_path,
+        "instructions",
+        deferred,
+        expected_revision=first["revision"],
+    )
+    completed = state.setup_transition(
+        tmp_path, "instructions", "complete", expected_revision=1
+    )
+
+    assert revised["revision"] == 1
+    assert completed["topics"]["instructions"]["status"] == "complete"
+    assert state.setup_status(tmp_path)["moduleKnowledge"]["decision"] == "defer"
+
+
+def test_tampered_terminal_module_generation_is_rejected_by_status_and_validate(
+    tmp_path,
+):
+    state.setup_init(tmp_path)
+    state.setup_transition(tmp_path, "instructions", "in_progress", expected_revision=0)
+    _write_instruction_artifacts(tmp_path)
+    body = _instructions_evidence(tmp_path)
+    body["moduleKnowledge"] = {"decision": "defer"}
+    body["repositoryContext"]["complexModules"] = [
+        {"path": "services/payments", "purpose": "Payment processing"}
+    ]
+    body["pendingModules"] = ["services/payments"]
+    state.write_topic_evidence(tmp_path, "instructions", body)
+    completed = state.setup_transition(
+        tmp_path, "instructions", "complete", expected_revision=1
+    )
+
+    evidence_path = tmp_path / ".agentic" / "setup" / "instructions-state.json"
+    tampered = json.loads(evidence_path.read_text(encoding="utf-8"))
+    tampered["evidence"]["moduleKnowledge"]["decision"] = "generate_now"
+    evidence_path.write_text(json.dumps(tampered), encoding="utf-8")
+
+    with pytest.raises(state.StateError, match="accepted module generation"):
+        state.setup_transition(
+            tmp_path,
+            "instructions",
+            "complete",
+            expected_revision=completed["revision"],
+        )
+    with pytest.raises(state.StateError, match="accepted module generation"):
+        state.setup_status(tmp_path)
+    with pytest.raises(state.StateError, match="accepted module generation"):
+        state.validate_setup_integrity(tmp_path, completed)
+    report = state.validate_all(tmp_path)
+    assert report["valid"] is False
+    assert any("accepted module generation" in error for error in report["errors"])
+
+
 def test_blocked_instruction_checks_require_a_blocked_topic_transition(tmp_path):
     state.setup_init(tmp_path)
     state.setup_transition(tmp_path, "instructions", "in_progress", expected_revision=0)
